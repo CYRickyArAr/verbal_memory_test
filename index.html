@@ -897,7 +897,7 @@
 
     function chooseNextWord() {
       const forceRepeat = consecutiveNewWords >= 5;
-      const shouldRepeat = forceRepeat || (shownWords.length > 2 && Math.random() < 0.35);
+      const shouldRepeat = forceRepeat || (shownWords.length > 2 && Math.random() < 0.4);
 
       if (shouldRepeat) {
         const seenPool = [...seenWords].filter(word => word !== currentWord);
