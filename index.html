@@ -105,6 +105,56 @@
       background: #e5e5e5;
     }
 
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 26px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.3s;
+      border-radius: 26px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #4CAF50;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+
+    input:disabled + .slider {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .game-box {
       width: min(760px, 100%);
       margin: 0 auto;
@@ -187,8 +237,6 @@
     .result-actions {
       display: flex;
       justify-content: center;
-      gap: 14px;
-      flex-wrap: wrap;
     }
 
     .footer-tools {
@@ -199,6 +247,26 @@
       gap: 8px;
       opacity: 0.35;
       transition: opacity 0.2s ease;
+    }
+
+    .music-bar {
+      position: fixed;
+      left: 18px;
+      top: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      z-index: 100;
+    }
+
+    .high-score {
+      position: fixed;
+      right: 18px;
+      top: 18px;
+      font-size: 16px;
+      color: #4CAF50;
+      z-index: 100;
     }
 
     .footer-tools:hover {
@@ -364,7 +432,7 @@
   <section id="gameScreen" class="screen">
     <div class="game-box">
       <div class="top-stats">
-        <span>Lives | <strong id="livesText">3</strong></span>
+        <span>Lives | <strong id="livesText">1</strong></span>
         <span>Score | <strong id="scoreText">0</strong></span>
       </div>
       <div id="wordText" class="word">word</div>
@@ -389,17 +457,14 @@
       <div class="result-kicker">Verbal Memory</div>
       <h2 id="finalScore" class="result-score">0 words</h2>
       <div id="finalTime" class="result-time">Total time 00:00.0</div>
-      <p class="result-subtitle">Save your score to see how you compare.</p>
       <div class="result-actions">
-        <button id="saveBtn" class="yellow-btn">Save score</button>
-        <button id="tryAgainBtn" class="blue-btn">Try again</button>
+        <button id="tryAgainBtn" class="yellow-btn">Try again</button>
       </div>
     </div>
   </section>
 
   <div id="historyPanel" class="history-panel">
     <div class="history-title">历史记录</div>
-    <div id="wordCountText" style="font-size:12px;color:#777;margin-bottom:8px;">Word bank: -</div>
     <table>
       <thead>
         <tr>
@@ -407,6 +472,7 @@
           <th>Score</th>
           <th>Time</th>
           <th>Date</th>
+          <th>Music</th>
         </tr>
       </thead>
       <tbody id="historyBody"></tbody>
@@ -415,8 +481,19 @@
 
   <div id="wordsPanel" class="words-panel">
     <div class="words-title">词汇表</div>
+    <div id="wordCountText" style="font-size:12px;color:#777;margin-bottom:8px;">Word bank: -</div>
     <div id="wordsList" class="words-list"></div>
   </div>
+
+  <div class="music-bar">
+    <span>🎵 音乐</span>
+    <label class="switch">
+      <input type="checkbox" id="musicToggle">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div id="highScoreDisplay" class="high-score"></div>
 
   <div class="footer-tools">
     <button id="historyBtn" class="small-btn">History</button>
@@ -433,7 +510,6 @@
     const startBtn = document.getElementById('startBtn');
     const seenBtn = document.getElementById('seenBtn');
     const newBtn = document.getElementById('newBtn');
-    const saveBtn = document.getElementById('saveBtn');
     const tryAgainBtn = document.getElementById('tryAgainBtn');
 
     const livesText = document.getElementById('livesText');
@@ -441,6 +517,19 @@
     const wordText = document.getElementById('wordText');
     const finalScore = document.getElementById('finalScore');
     const finalTime = document.getElementById('finalTime');
+
+    const musicToggle = document.getElementById('musicToggle');
+    const bgMusic = new Audio('学习音乐.mp3');
+    bgMusic.loop = true;
+
+    musicToggle.addEventListener('change', function() {
+      if (this.checked) {
+        bgMusic.play().catch(e => console.log('播放失败:', e));
+      } else {
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
+      }
+    });
 
     const historyBtn = document.getElementById('historyBtn');
     const viewWordsBtn = document.getElementById('viewWordsBtn');
@@ -451,407 +540,724 @@
     const historyPanel = document.getElementById('historyPanel');
     const historyBody = document.getElementById('historyBody');
     const wordCountText = document.getElementById('wordCountText');
+    const highScoreDisplay = document.getElementById('highScoreDisplay');
 
     const storageKey = 'local-verbal-memory-results';
     const customWordsKey = 'local-verbal-memory-custom-words';
 
     const builtInWordList = [
-      'abacus', 'abase', 'abate', 'abbreviate', 'abbreviation', 'abdicate', 'abdominal', 'abduct', 'aberrant', 'abhor', 
-      'abide', 'abiding', 'abject', 'ablaze', 'ably', 'abnormality', 'abode', 'abominable', 'abort', 'aboveboard', 
-      'abrasive', 'abreast', 'absentee', 'abstain', 'abstention', 'abstinence', 'abusive', 'abyss', 'academician', 'accede', 
-      'accentuate', 'accessible', 'accession', 'acclaim', 'accompanist', 'accomplice', 'accountable', 'accountancy', 'accredit', 'accrue', 
-      'acoustics', 'acquiesce', 'acquit', 'acquittal', 'acrimony', 'actuality', 'acumen', 'adamant', 'addictive', 'additive', 
-      'adept', 'adhesive', 'ad', 'adjoin', 'adjourn', 'adjudicate', 'adjunct', 'admissible', 'admonish', 'ado', 
-      'adorn', 'adrift', 'adroit', 'adulterate', 'adultery', 'advent', 'adversary', 'adverse', 'adversity', 'advocacy', 
-      'aerobatics', 'aerobics', 'aerodynamics', 'aerosol', 'aerospace', 'affable', 'affiliate', 'affinity', 'afflict', 'affront', 
-      'afield', 'afloat', 'afoot', 'afresh', 'aggravate', 'aggregate', 'aggrieved', 'agile', 'agitate', 'agitation', 
-      'agnostic', 'agonizing', 'aground', 'AIDS', 'ailing', 'ailment', 'airborne', 'airily', 'airlift', 'airstrip', 
-      'airy', 'ajar', 'à', 'alchemy', 'alcoholism', 'alias', 'alibi', 'alight', 'alight', 'align', 
-      'alimony', 'alkali', 'Allah', 'allay', 'allegiance', 'allegory', 'allergic', 'allergy', 'alleviate', 'allude', 
-      'allure', 'allusion', 'almanac', 'alms', 'amalgamate', 'amass', 'ambience', 'ambivalent', 'ambush', 'amenity', 
-      'amiable', 'amicable', 'amidst', 'amnesia', 'amnesty', 'amoral', 'amphibian', 'amphibious', 'anagram', 'anal', 
-      'analogue', 'anarchic', 'anarchist', 'anarchy', 'anew', 'anguish', 'animate', 'animation', 'animosity', 'annihilate', 
-      'annuity', 'anomaly', 'anonymity', 'antagonize', 'antelope', 'anthology', 'anthropology', 'antibody', 'antidote', 'antilogarithm', 
-      'antipathy', 'antler', 'anus', 'apace', 'apartheid', 'apathy', 'apex', 'apiece', 'apoplexy', 'apparel', 
-      'appease', 'append', 'appendicitis', 'appendix', 'apposite', 'appraisal', 'appraise', 'apprehend', 'apprehension', 'aquarium', 
-      'arbiter', 'arbitrate', 'arcade', 'archaic', 'archer', 'archetype', 'archipelago', 'archive', 'ardent', 'arduous', 
-      'ark', 'armada', 'armoury', 'aroma', 'aromatic', 'arrears', 'arsenal', 'arson', 'artful', 'arthritis', 
-      'articulate', 'artifice', 'artisan', 'ascendant', 'ascertain', 'ascetic', 'ascribe', 'aspiration', 'aspire', 'assail', 
-      'assailant', 'assent', 'assertive', 'assiduous', 'assimilate', 'assorted', 'assortment', 'asterisk', 'asthma', 'astral', 
-      'astray', 'astrology', 'astrophysics', 'asylum', 'asymmetric', 'atrocious', 'atrocity', 'attest', 'attribute', 'attrition', 
-      'auctioneer', 'audacious', 'audible', 'audition', 'augment', 'august', 'aura', 'auspicious', 'austere', 'austerity', 
-      'authoritarian', 'autocrat', 'autocratic', 'autograph', 'autopsy', 'avail', 'aversion', 'avert', 'avid', 'awesome', 
-      'babble', 'backbiting', 'backbreaking', 'backdate', 'backdrop', 'backfire', 'backhand', 'backside', 'backwater', 'badger', 
-      'badger', 'baffle', 'baleful', 'balk', 'ballad', 'ballast', 'ballerina', 'ballistics', 'balm', 'balmy', 
-      'balustrade', 'banal', 'bandwagon', 'bane', 'banish', 'banjo', 'banter', 'baritone', 'baroque', 'barrage', 
-      'barricade', 'barrister', 'barrow', 'barter', 'bash', 'bashful', 'bask', 'bastion', 'baton', 'battalion', 
-      'bawl', 'bay', 'bayonet', 'bazaar', 'bearing', 'beastly', 'beating', 'beautify', 'beckon', 'begrudge', 
-      'beguile', 'bemoan', 'bemused', 'benchmark', 'benediction', 'beneficiary', 'benevolence', 'benevolent', 'benign', 'bequeath', 
-      'bequest', 'bereaved', 'beset', 'bewitch', 'bicker', 'bifocals', 'bigot', 'bile', 'billiards', 'billow', 
-      'binge', 'bingo', 'bipartisan', 'bisect', 'bitch', 'bizarre', 'blackmail', 'blackout', 'blanch', 'blare', 
-      'blatant', 'bleep', 'blemish', 'bliss', 'blitz', 'blizzard', 'blob', 'blotter', 'blues', 'blunder', 
-      'blur', 'blurb', 'blurt', 'bobsleigh', 'bog', 'boggle', 'bogus', 'boisterous', 'bombard', 'bombshell', 
-      'bona', 'bonfire', 'bonnet', 'boo', 'booby', 'boon', 'boost', 'bootleg', 'booze', 'bountiful', 
-      'bounty', 'bout', 'boutique', 'brace', 'braid', 'braille', 'brainwash', 'brash', 'bravado', 'brevity', 
-      'bridal', 'bridle', 'Briton', 'brittle', 'broccoli', 'broke', 'broker', 'brokerage', 'bronchitis', 'brothel', 
-      'browser', 'brunette', 'brunt', 'brusque', 'brutish', 'buddy', 'budge', 'buff', 'buffer', 'buggy', 
-      'bulge', 'bulk', 'bulky', 'bullheaded', 'bum', 'bumper', 'bunk', 'bunker', 'buoyancy', 'burrow', 
-      'bustle', 'buttock', 'buzz', 'bypass', 'cabaret', 'cache', 'cackle', 'CAD', 'cajole', 'calamity', 
-      'calculating', 'callous', 'callow', 'cameo', 'camouflage', 'candid', 'cannibal', 'canny', 'canoe', 'canon', 
-      'canopy', 'canter', 'canvass', 'cape', 'cape', 'capillary', 'capitulate', 'caprice', 'capricious', 'capsize', 
-      'captivate', 'captivity', 'carat', 'carbohydrate', 'cardiac', 'caress', 'caricature', 'carnage', 'carnal', 'carnation', 
-      'carnivore', 'carp', 'cartridge', 'cascade', 'cashmere', 'caste', 'catalyst', 'catcall', 'catchword', 'catchy', 
-      'categorical', 'cathode', 'Catholicism', 'catwalk', 'causal', 'cavern', 'caviar', 'cavity', 'cedar', 'cede', 
-      'celestial', 'censor', 'censorious', 'censorship', 'censure', 'centenary', 'centrist', 'cerebral', 'ceremonious', 'certify', 
-      'certitude', 'cesspit', 'chalet', 'chant', 'chaplain', 'charisma', 'charismatic', 'charwoman', 'chaste', 'chastity', 
-      'chauvinism', 'checkmate', 'chic', 'chieftain', 'chime', 'chimpanzee', 'chirp', 'chisel', 'chivalry', 'chlorophyll', 
-      'chloroplast', 'cholera', 'cholesterol', 'choppy', 'choral', 'choreography', 'christen', 'chrome', 'chromosome', 'chronology', 
-      'chubby', 'chuck', 'chum', 'churlish', 'churn', 'cinder', 'circumstantial', 'circumvent', 'clad', 'claimant', 
-      'clamber', 'clandestine', 'clatter', 'claustrophobia', 'cleanse', 'cleavage', 'cleave', 'cliche', 'climactic', 'clinch', 
-      'clog', 'clot', 'clump', 'clutter', 'coax', 'cobble', 'cobra', 'cocaine', 'cocky', 'coddle', 
-      'coefficient', 'coerce', 'coercion', 'coexist', 'cog', 'cognitive', 'coherent', 'cohesive', 'collate', 'collude', 
-      'collusion', 'colon', 'colonize', 'colossal', 'colossus', 'colt', 'combustible', 'commandant', 'commensurate', 'commentate', 
-      'communicable', 'communion', 'communique', 'compatible', 'compatriot', 'complementary', 'complexion', 'composite', 'composure', 'compulsion', 
-      'compunction', 'con', 'concede', 'concentric', 'concerto', 'conciliate', 'concord', 'concur', 'condescend', 'condom', 
-      'confection', 'confederacy', 'confederate', 'confer', 'confetti', 'confidant', 'confide', 'configuration', 'confinement', 'conflate', 
-      'congenial', 'congenital', 'congested', 'coniferous', 'conjecture', 'conjure', 'connoisseur', 'connotation', 'connote', 'conscript', 
-      'consecrate', 'consensus', 'consign', 'consignment', 'console', 'consortium', 'conspiracy', 'conspire', 'constancy', 'constituent', 
-      'constrain', 'constraint', 'consummate', 'containerization', 'contemplate', 'contend', 'contingency', 'contingent', 'contingent', 'continuum', 
-      'contort', 'contour', 'contraceptive', 'contrive', 'conurbation', 'convene', 'converge', 'conversant', 'convertible', 'convoy', 
-      'convulse', 'coop', 'cornet', 'corollary', 'coronation', 'coroner', 'corps', 'corpulent', 'corpus', 'correlate', 
-      'corroborate', 'corrode', 'corrosion', 'corrugated', 'countenance', 'counteract', 'counterbalance', 'counterfeit', 'coup', 'coup', 
-      'courier', 'courtship', 'covenant', 'coverage', 'covert', 'covet', 'cowardice', 'coy', 'crackle', 'cram', 
-      'cramp', 'cranky', 'crap', 'crater', 'crave', 'craven', 'creak', 'crease', 'credentials', 'credibility', 
-      'cremate', 'crematorium', 'creole', 'crescent', 'cringe', 'crinkle', 'critique', 'croak', 'crockery', 'crook', 
-      'crooked', 'crossbow', 'crotch', 'crucify', 'crunch', 'crux', 'crypt', 'cryptic', 'cub', 'cuckoo', 
-      'cuddle', 'cudgel', 'culminate', 'culprit', 'cult', 'cumbersome', 'cumulative', 'curator', 'curd', 'curfew', 
-      'cursive', 'cursory', 'curt', 'curtail', 'custard', 'cute', 'cutlery', 'cyberspace', 'cynic', 'cynicism', 
-      'dab', 'dab', 'Dacron', 'daffodil', 'daft', 'dainty', 'dais', 'daisy', 'dampen', 'damper', 
-      'damsel', 'dandelion', 'dandy', 'dandy', 'dangle', 'dank', 'dapper', 'dappled', 'daredevil', 'darn', 
-      'dated', 'daunt', 'dauntless', 'dawdle', 'deacon', 'deaden', 'deadlock', 'debacle', 'debase', 'debilitate', 
-      'debit', 'debris', 'debug', 'decadent', 'decease', 'decelerate', 'decency', 'decimate', 'decipher', 'deckhand', 
-      'declaim', 'decompose', 'decor', 'decorous', 'decorum', 'decoy', 'decry', 'deductible', 'deem', 'deface', 
-      'defame', 'defer', 'defile', 'defile', 'definitive', 'deflate', 'defoliate', 'deform', 'defraud', 'defrost', 
-      'deft', 'defunct', 'defuse', 'degenerate', 'degrade', 'dehydrate', 'deify', 'deity', 'deliberate', 'deliberation', 
-      'delimit', 'delineate', 'delirious', 'deliverance', 'delude', 'deluge', 'de', 'delve', 'demagogy', 'demean', 
-      'demented', 'demo', 'demobilize', 'demography', 'demon', 'demonic', 'demonstrable', 'demote', 'denim', 'denizen', 
-      'denominate', 'dent', 'dentistry', 'deodorant', 'deplete', 'deplore', 'depopulate', 'depose', 'depository', 'deprecate', 
-      'depreciate', 'deputation', 'derail', 'Derby', 'deregulate', 'deride', 'derision', 'derogatory', 'derrick', 'desegregate', 
-      'desiccate', 'desirous', 'despicable', 'despoil', 'despotism', 'destitute', 'detachable', 'determiner', 'deterrent', 'detest', 
-      'detonate', 'detour', 'detract', 'devastate', 'deviant', 'deviate', 'deviation', 'devious', 'devoid', 'devolve', 
-      'devout', 'dexterity', 'diabetes', 'diagonal', 'dialectic', 'diametrically', 'dice', 'dichotomy', 'dictum', 'didactic', 
-      'diddle', 'diehard', 'differentiate', 'diffidence', 'diffident', 'dignitary', 'digress', 'dilapidated', 'dilate', 'dilettante', 
-      'dimple', 'din', 'din', 'dinghy', 'dingy', 'diocese', 'diode', 'diphthong', 'dipper', 'dire', 
-      'directive', 'disarray', 'disassociate', 'disavow', 'disband', 'discernible', 'discerning', 'disclaim', 'disconcert', 'discredit', 
-      'discreet', 'discrete', 'discus', 'disenchant', 'disentangle', 'disinterested', 'disjointed', 'disjunctive', 'dislocate', 'dislodge', 
-      'dismantle', 'disparate', 'disparity', 'dispensable', 'dispensation', 'dispirited', 'disposed', 'disprove', 'disrepute', 'disrespect', 
-      'disseminate', 'dissension', 'disservice', 'dissipated', 'dissociate', 'dissolute', 'dissonance', 'dissuade', 'distaste', 'distraught', 
-      'disunite', 'disuse', 'dither', 'ditto', 'ditty', 'diverge', 'divergent', 'dividend', 'divine', 'divinity', 
-      'divisive', 'divulge', 'docile', 'doctorate', 'dogma', 'dogmatic', 'doldrums', 'dole', 'dole', 'doleful', 
-      'dollop', 'domain', 'domesticate', 'domesticity', 'domicile', 'domineer', 'domineering', 'doodle', 'doomed', 'doomsday', 
-      'dope', 'dormant', 'dosage', 'dossier', 'dote', 'doting', 'dowager', 'down', 'downgrade', 'downhearted', 
-      'downhill', 'downright', 'downstream', 'downtime', 'dowry', 'drab', 'drape', 'drapery', 'draught', 'drawl', 
-      'dredge', 'dregs', 'drench', 'dressy', 'dribble', 'drily', 'dripping', 'drone', 'drool', 'drowse', 
-      'dub', 'duchy', 'duct', 'duet', 'duff', 'dumpy', 'dunce', 'dune', 'dungarees', 'dungeon', 
-      'duo', 'dupe', 'duplicity', 'dusky', 'dustcart', 'dynamics', 'dynamism', 'earl', 'earmark', 'earthen', 
-      'earthenware', 'earthwork', 'earthy', 'easel', 'eaves', 'eavesdrop', 'ebony', 'eccentricity', 'eclectic', 'ecstasy', 
-      'ecstatic', 'eczema', 'eddy', 'edgy', 'edict', 'edifice', 'eerie', 'efface', 'effeminate', 'efficacy', 
-      'effluent', 'egalitarian', 'egg', 'egocentric', 'egoism', 'egoist', 'egotism', 'ejaculate', 'eject', 'elated', 
-      'electioneering', 'electorate', 'electrify', 'electrocute', 'electrode', 'electroplate', 'electroscope', 'electrostatic', 'elemental', 'elf', 
-      'elicit', 'eligible', 'elite', 'elope', 'elucidate', 'elude', 'elusive', 'emaciated', 'emanate', 'embankment', 
-      'embattled', 'embed', 'embellish', 'embezzle', 'emblem', 'embody', 'emboss', 'embroil', 'emend', 'emir', 
-      'emissary', 'empathy', 'empiricism', 'empower', 'emulate', 'encampment', 'encase', 'enclave', 'encompass', 'encore', 
-      'encroach', 'encumber', 'endanger', 'endemic', 'endorse', 'endways', 'energize', 'enfeeble', 'enfold', 'engender', 
-      'engross', 'enhance', 'enigma', 'enigmatic', 'enliven', 'enmity', 'ennoble', 'enormity', 'enrage', 'ensconce', 
-      'ensemble', 'enshrine', 'ensign', 'enslave', 'ensue', 'entail', 'entangle', 'enthrone', 'entice', 'entity', 
-      'entourage', 'entreat', 'entree', 'entrust', 'entwine', 'enumerate', 'enviable', 'eon', 'ephemeral', 'epigram', 
-      'epitaph', 'epitome', 'equivocal', 'equable', 'equate', 'equiangular', 'equidistant', 'equilateral', 'equilibrium', 'equinox', 
-      'equitable', 'erasure', 'erotic', 'errant', 'erratic', 'erudite', 'escalate', 'eschew', 'Eskimo', 'esoteric', 
-      'espionage', 'espouse', 'estancia', 'estimable', 'estrange', 'etceteras', 'etch', 'ethereal', 'ethic', 'ethical', 
-      'ethics', 'ethos', 'etiquette', 'eulogy', 'euphemism', 'euphemistic', 'euphoria', 'euthanasia', 'evacuate', 'evade', 
-      'evanescent', 'evangelical', 'evangelist', 'evasive', 'evermore', 'evict', 'eviction', 'evince', 'evocative', 'evoke', 
-      'evolutionary', 'ewe', 'exacerbate', 'exalt', 'exaltation', 'exalted', 'exasperate', 'excavate', 'excellency', 'excerpt', 
-      'excise', 'excise', 'excusable', 'execrable', 'exemplary', 'exemplify', 'exhilarate', 'exhilarating', 'exhort', 'existential', 
-      'existentialist', 'exodus', 'exonerate', 'exotic', 'expansive', 'expectancy', 'expectant', 'expedient', 'expedite', 'expiry', 
-      'explicable', 'exploit', 'exponent', 'expound', 'expropriate', 'expulsion', 'expunge', 'expurgate', 'extant', 'exterminate', 
-      'extort', 'extortionate', 'extract', 'extraction', 'extractor', 'extradite', 'extraneous', 'extrapolate', 'extraterrestrial', 'extremism', 
-      'extremities', 'extremity', 'extricate', 'exuberant', 'exude', 'exult', 'eyewash', 'fabricate', 'facade', 'facet', 
-      'facile', 'facing', 'faction', 'factitious', 'fad', 'fag', 'failing', 'fainthearted', 'fairground', 'fairway', 
-      'falcon', 'fallacious', 'fallacy', 'fallible', 'fallow', 'fallow', 'falsetto', 'falsify', 'falsity', 'familial', 
-      'fanciful', 'faraway', 'farce', 'farsighted', 'fastidious', 'fatalism', 'fatality', 'fated', 'fateful', 'fatuous', 
-      'faucet', 'fauna', 'fawn', 'fawn', 'faze', 'featherbrained', 'feckless', 'fecund', 'federalism', 'federalist', 
-      'federate', 'feebleminded', 'feign', 'feint', 'felicity', 'felony', 'felt', 'femininity', 'fen', 'fence', 
-      'fend', 'fender', 'ferocity', 'ferret', 'fervent', 'fester', 'festive', 'festivity', 'festoon', 'fetching', 
-      'fete', 'fetid', 'fetish', 'fetter', 'fetus', 'feud', 'feverish', 'fiasco', 'fibreglass', 'fickle', 
-      'fictitious', 'fiddling', 'fiddly', 'fidget', 'fieldwork', 'fiend', 'fiendish', 'fig', 'figment', 'figurative', 
-      'figurehead', 'filial', 'fillet', 'finale', 'finely', 'finery', 'finesse', 'fingertip', 'finicky', 'firebrand', 
-      'firebrick', 'firedamp', 'firepower', 'fiscal', 'fishery', 'fishmonger', 'fissure', 'fitful', 'fitting', 'fixer', 
-      'fixture', 'fizz', 'flabby', 'flaccid', 'flag', 'flagpole', 'flagrant', 'flail', 'flair', 'flak', 
-      'flamboyant', 'flammable', 'flank', 'flare', 'flashback', 'flaunt', 'flawless', 'flax', 'flaxen', 'fleck', 
-      'fleeting', 'flex', 'flexitime', 'flicker', 'flier', 'flighty', 'flimsy', 'flinch', 'flip', 'flippant', 
-      'flirt', 'flit', 'flog', 'floodgate', 'floodlight', 'flop', 'floppy', 'floral', 'florid', 'florist', 
-      'flounder', 'flout', 'fluidity', 'fluke', 'flunk', 'flurry', 'flux', 'flyer', 'flyleaf', 'flywheel', 
-      'fogy', 'foible', 'foil', 'foil', 'foist', 'fold', 'folder', 'folivore', 'folklore', 'fondle', 
-      'font', 'foolproof', 'foothill', 'foothold', 'footloose', 'footman', 'footwork', 'forage', 'foray', 'forbear', 
-      'forbear', 'forbidding', 'forceps', 'forcible', 'forebode', 'foreboding', 'forecourt', 'forefront', 'forego', 'foreground', 
-      'foreknowledge', 'foreland', 'forensic', 'forerunner', 'foreshadow', 'foreshore', 'forestall', 'forester', 'foretaste', 'forethought', 
-      'forewarn', 'forfeit', 'forge', 'forlorn', 'formative', 'formulate', 'formulation', 'fornicate', 'forsake', 'forte', 
-      'forthright', 'forthwith', 'fortify', 'fortuitous', 'foul', 'foul', 'fount', 'fractious', 'fracture', 'franchise', 
-      'frantic', 'fraternal', 'fraudulent', 'fraught', 'fray', 'fray', 'freak', 'freckle', 'freehand', 'freelance', 
-      'freewheel', 'freighter', 'frenetic', 'frenzied', 'frenzy', 'fresco', 'fret', 'fretful', 'frigid', 'frill', 
-      'frisk', 'fritter', 'frivolity', 'frivolous', 'frizzy', 'frock', 'frogman', 'frolic', 'frontage', 'frontal', 
-      'frontbench', 'frostbite', 'froth', 'fruiterer', 'fruition', 'fry', 'fuddle', 'fudge', 'fudge', 'fugitive', 
-      'fumble', 'funicular', 'funk', 'funky', 'furl', 'furnishings', 'furrier', 'furrow', 'furtive', 'fuse', 
-      'futility', 'futuristic', 'fuzz', 'fuzzy', 'gabble', 'gable', 'gag', 'gaiety', 'gala', 'gallant', 
-      'galvanize', 'gambit', 'gape', 'garland', 'gastric', 'gastritis', 'gauge', 'gaunt', 'gazette', 'gearbox', 
-      'generate', 'generative', 'generic', 'genesis', 'genial', 'genteel', 'gentility', 'germinate', 'gesticulate', 'ghastly', 
-      'gibber', 'gibberish', 'gibbon', 'giddy', 'gill', 'gimmick', 'girder', 'girdle', 'glacial', 'gladiator', 
-      'glaze', 'glean', 'glee', 'gloat', 'gloss', 'glossary', 'glum', 'glutton', 'gnarled', 'gobble', 
-      'goggle', 'goody', 'gorge', 'gospel', 'graffiti', 'graft', 'graft', 'grandeur', 'grandiose', 'granular', 
-      'granule', 'grapple', 'grate', 'gratify', 'gratuitous', 'gravel', 'gravitate', 'gregarious', 'grid', 'grievance', 
-      'grievous', 'gripe', 'grisly', 'grotesque', 'grounding', 'grove', 'grovel', 'gruesome', 'gruff', 'grumpy', 
-      'guise', 'gurgle', 'guru', 'gush', 'gusto', 'guttural', 'habitue', 'hack', 'hack', 'hacked', 
-      'hackle', 'hackneyed', 'hacksaw', 'hag', 'haggard', 'haggle', 'hairdo', 'hairpiece', 'hale', 'hallmark', 
-      'hallowed', 'hallucinate', 'hallucination', 'halo', 'halter', 'hamlet', 'hammock', 'hamper', 'hamstring', 'handbrake', 
-      'handily', 'handiness', 'handiwork', 'handlebar', 'handpicked', 'handsomely', 'handstand', 'handyman', 'hangar', 'hanger', 
-      'hangings', 'hangman', 'hangnail', 'hangover', 'hanker', 'haphazard', 'hapless', 'harangue', 'harass', 'harbinger', 
-      'hardball', 'hardboard', 'hardbitten', 'hardcore', 'hardheaded', 'hardtop', 'hardwood', 'harebrained', 'harelip', 'harmonica', 
-      'harmonium', 'harness', 'harp', 'harp', 'harpoon', 'harrow', 'harrowing', 'hash', 'hassle', 'hatchback', 
-      'hatchery', 'hatchet', 'haulage', 'haunch', 'haven', 'haversack', 'havoc', 'haystack', 'haywire', 'haze', 
-      'hazel', 'headdress', 'headgear', 'headhunter', 'headland', 'headrest', 'headship', 'headstone', 'headstrong', 'headway', 
-      'heady', 'hearsay', 'hearse', 'hearten', 'hearth', 'heartland', 'heartrending', 'heartstring', 'heartwarming', 'heathen', 
-      'heatstroke', 'heck', 'heckle', 'hectic', 'hector', 'hedonism', 'hedonist', 'heed', 'hefty', 'hegemony', 
-      'heifer', 'heinous', 'heirloom', 'helium', 'helm', 'hemline', 'hemlock', 'hemophilia', 'hemorrhage', 'hemorrhoid', 
-      'hemp', 'henceforth', 'henchman', 'henpecked', 'hepatitis', 'herbivore', 'herbivorous', 'hereafter', 'hereby', 'heredity', 
-      'herein', 'hereof', 'hereto', 'heretofore', 'heresy', 'heretic', 'heretical', 'herewith', 'hermetic', 'hermitage', 
-      'heterodox', 'heterogeneous', 'hew', 'heyday', 'hiatus', 'hibernate', 'hideaway', 'hidebound', 'hierarchical', 'hierarchy', 
-      'hieroglyphics', 'highbrow', 'highchair', 'highhanded', 'Highness', 'hilarious', 'hillock', 'hilt', 'Hindi', 'hindmost', 
-      'hindquarters', 'hindsight', 'Hinduism', 'Hispanic', 'hiss', 'histrionic', 'hither', 'HIV', 'hive', 'hoard', 
-      'hoarding', 'hoary', 'hoax', 'hobble', 'hobbyhorse', 'hobgoblin', 'hobnail', 'hobnob', 'hod', 'hoggish', 
-      'hogshead', 'holdall', 'holding', 'holiness', 'holly', 'holocaust', 'hologram', 'holster', 'homage', 'homestead', 
-      'homicide', 'homily', 'homing', 'homogeneity', 'homogeneous', 'homosexual', 'honeycomb', 'honk', 'hoodwink', 'hooligan', 
-      'hooray', 'hoot', 'Hoover', 'hopper', 'horde', 'hormone', 'hornet', 'horoscope', 'horrendous', 'horrid', 
-      'horrific', 'horseplay', 'horseshoe', 'horticulture', 'hosiery', 'hospice', 'hotbed', 'hotchpotch', 'hotelier', 'hotfoot', 
-      'hothead', 'hothouse', 'hotly', 'hotplate', 'hotpot', 'housebound', 'housecoat', 'housecraft', 'housemaster', 'housewifery', 
-      'hovel', 'howler', 'HRH', 'hub', 'hubbub', 'huckster', 'huddle', 'hue', 'hue', 'huff', 
-      'hulk', 'hulking', 'hull', 'humbug', 'humdrum', 'humility', 'hump', 'humpback', 'humus', 'hunch', 
-      'hunchback', 'hundredweight', 'hunk', 'hurdle', 'hurtle', 'husbandry', 'husk', 'husky', 'hutch', 'hybrid', 
-      'hydrant', 'hydraulic', 'hydrochloric', 'hydroelectricity', 'hydroxide', 'hype', 'hyperactive', 'hypercritical', 'hypermarket', 'hypertension', 
-      'hyphenate', 'hypnosis', 'hypnotic', 'hypnotism', 'hypocrisy', 'hypodermic', 'hypotenuse', 'hypothesis', 'icebreaker', 'icicle', 
-      'icing', 'icon', 'idiosyncrasy', 'idolatry', 'idyllic', 'ignite', 'ignition', 'ignoble', 'ignominy', 'illicit', 
-      'illustrator', 'illustrious', 'imagery', 'imbecile', 'imbecility', 'imbibe', 'imbue', 'immaculate', 'immaterial', 'immerse', 
-      'immobile', 'immune', 'immunize', 'impair', 'impale', 'impart', 'impartial', 'impasse', 'impassioned', 'impassive', 
-      'impeccable', 'impede', 'impediment', 'impel', 'impending', 'impenetrable', 'imperceptible', 'imperil', 'imperious', 'impersonate', 
-      'impertinent', 'impetuous', 'impetus', 'impinge', 'impious', 'implacable', 'implant', 'implicit', 'implore', 'impostor', 
-      'impotence', 'impotent', 'impound', 'impoverish', 'impregnable', 'impregnate', 'impressionable', 'imprint', 'impromptu', 'improvise', 
-      'imprudent', 'inadvertent', 'inanimate', 'inarticulate', 'inborn', 'inbuilt', 'incantation', 'incapacitate', 'incarnate', 'incarnation', 
-      'incendiary', 'incense', 'incense', 'incensed', 'inception', 'incessant', 'incest', 'incinerate', 'incipient', 'incise', 
-      'incisive', 'incite', 'incoherent', 'incoming', 'incompatible', 'inconceivable', 'incontrovertible', 'incredulous', 'incriminate', 'incubate', 
-      'incubation', 'incubator', 'inculcate', 'incumbent', 'incur', 'incursion', 'indecision', 'indelible', 'indemnify', 'indemnity', 
-      'indent', 'indeterminate', 'indict', 'indigenous', 'indigestion', 'indigo', 'indiscreet', 'indiscriminate', 'indisposed', 'indisputable', 
-      'indistinguishable', 'indoctrinate', 'indolent', 'indubitable', 'induct', 'induction', 'ineffectual', 'ineluctable', 'inept', 'inescapable', 
-      'inestimable', 'inexhaustible', 'inexorable', 'inexplicable', 'infallible', 'infamous', 'infantile', 'infantry', 'infatuated', 'infatuation', 
-      'infernal', 'infest', 'infidelity', 'infighting', 'infiltrate', 'infirm', 'infirmary', 'infirmity', 'inflame', 'inflamed', 
-      'inflammable', 'inflammation', 'inflammatory', 'inflection', 'inflexible', 'inflict', 'inflow', 'influx', 'infrared', 'infrastructure', 
-      'infringe', 'infuriate', 'infuse', 'ingenuous', 'inglorious', 'ingrained', 'ingratiate', 'ingratiating', 'inhibit', 'injunction', 
-      'injurious', 'inkling', 'inlaid', 'inmate', 'inmost', 'innate', 'inoculate', 'inoffensive', 'inordinate', 'inquisition', 
-      'inquisitive', 'insanity', 'insatiable', 'inset', 'insidious', 'insinuate', 'insipid', 'insofar', 'insolent', 'insoluble', 
-      'insomnia', 'insomniac', 'insomuch', 'instep', 'instigate', 'insular', 'insulate', 'insuperable', 'insurgent', 'insurrection', 
-      'intake', 'intangible', 'integer', 'intelligible', 'intercession', 'interface', 'interject', 'interjection', 'interlock', 'interlocutor', 
-      'interloper', 'interlude', 'intermediary', 'interment', 'interminable', 'intermingle', 'intermittent', 'intern', 'intern', 'interplay', 
-      'interpose', 'interrogate', 'intersperse', 'intestinal', 'intimacy', 'intimidate', 'intoxicant', 'intoxicate', 'intractable', 'intransigent', 
-      'intransitive', 'intrepid', 'intricacy', 'intrigue', 'intriguing', 'intrinsic', 'introvert', 'intrusive', 'intuition', 'intuitive', 
-      'inundate', 'invalidate', 'inveterate', 'invidious', 'invigilate', 'invigilator', 'invigorate', 'invincible', 'invocation', 'invoice', 
-      'invoke', 'involuntary', 'invulnerable', 'iodide', 'iodine', 'ion', 'irascible', 'iris', 'irk', 'irksome', 
-      'irradiate', 'irreconcilable', 'irreducible', 'irreparable', 'irrepressible', 'irrespective', 'irretrievable', 'irreverent', 'irreversible', 'irrevocable', 
-      'irritant', 'irruption', 'isotherm', 'isothermal', 'isotope', 'issuance', 'itch', 'itinerant', 'itinerary', 'ivy', 
-      'jab', 'jagged', 'jargon', 'javelin', 'jaywalk', 'jeer', 'jellyfish', 'jerky', 'jest', 'jetty', 
-      'jigsaw', 'jingle', 'jocular', 'jog', 'jolt', 'jostle', 'joystick', 'jubilant', 'judicious', 'juggle', 
-      'jumble', 'jumbo', 'juncture', 'jurisdiction', 'juror', 'juvenile', 'juxtapose', 'keel', 'kennel', 'kernel', 
-      'kickoff', 'kin', 'kindred', 'kinship', 'kiwi', 'knack', 'knead', 'knowhow', 'laborious', 'lacquer', 
-      'ladle', 'lager', 'lagoon', 'lament', 'lance', 'languid', 'languish', 'lapse', 'laryngitis', 'larynx', 
-      'latch', 'lateral', 'lathe', 'launderette', 'laurel', 'lavish', 'lawsuit', 'lax', 'layoff', 'ledge', 
-      'ledger', 'lee', 'leek', 'leeway', 'legendary', 'legible', 'legislate', 'legitimize', 'leniency', 'lenient', 
-      'lentil', 'leprosy', 'Lesbian', 'lethal', 'levee', 'levee', 'leverage', 'levity', 'lexical', 'lexicography', 
-      'lexis', 'lieu', 'ligament', 'lighten', 'liken', 'likeness', 'lilac', 'limelight', 'lineage', 'linesman', 
-      'liquidate', 'literal', 'literally', 'literate', 'litigation', 'liven', 'livid', 'loathe', 'lobe', 'loft', 
-      'logistics', 'logo', 'loin', 'loiter', 'loll', 'lookout', 'loophole', 'loot', 'lop', 'lopsided', 
-      'lotion', 'lotus', 'louse', 'lousy', 'lowbrow', 'lubricant', 'lucid', 'lucrative', 'ludicrous', 'lug', 
-      'lukewarm', 'lull', 'lullaby', 'luminous', 'lunacy', 'lunge', 'lurch', 'lure', 'lurk', 'luscious', 
-      'lush', 'lust', 'luxuriant', 'lychee', 'lynch', 'lyric', 'lyrical', 'macaroni', 'macho', 'mackerel', 
-      'macroeconomic', 'madden', 'Mafia', 'maggot', 'magnate', 'magnetism', 'magnitude', 'magnolia', 'magpie', 'maim', 
-      'mainspring', 'mainstay', 'majestic', 'makeshift', 'maladjusted', 'maladministration', 'malformed', 'malfunction', 'malign', 'malignancy', 
-      'malignant', 'malpractice', 'malt', 'mammoth', 'manacle', 'manageable', 'managerial', 'mandarin', 'mandate', 'mandatory', 
-      'mane', 'manful', 'manger', 'mania', 'maniac', 'manic', 'manicure', 'manifestation', 'manifesto', 'manslaughter', 
-      'mantelpiece', 'mantle', 'manure', 'Maori', 'mar', 'mare', 'marginal', 'marijuana', 'marital', 'marking', 
-      'marksman', 'marquee', 'mart', 'martial', 'mascot', 'mash', 'masked', 'masquerade', 'mastermind', 'matinee', 
-      'mating', 'matriculate', 'matrix', 'matron', 'maul', 'mauve', 'maverick', 'maxim', 'mayhem', 'maze', 
-      'mean', 'meander', 'measles', 'measurable', 'Mecca', 'meddle', 'mediate', 'medicaid', 'medication', 'mediocre', 
-      'meditate', 'meek', 'megaphone', 'mellow', 'melodrama', 'membrane', 'memento', 'memorandum', 'menial', 'meningitis', 
-      'menopause', 'menstrual', 'mercantile', 'mercenary', 'mermaid', 'mesh', 'Messiah', 'metabolism', 'metallurgy', 'metaphysical', 
-      'meteor', 'meteorology', 'meteorological', 'methane', 'methodical', 'methodology', 'meticulous', 'microbiology', 'microscope', 'midget', 
-      'migraine', 'migrant', 'militant', 'militarism', 'militiaman', 'millet', 'millipede', 'mime', 'mimic', 'mince', 
-      'mink', 'mirage', 'mire', 'mirth', 'misadventure', 'misapprehend', 'misappropriate', 'misbehave', 'miscarriage', 'miscellaneous', 
-      'misconduct', 'misfit', 'misgiving', 'misplace', 'mitigate', 'mitten', 'moat', 'mockery', 'modular', 'module', 
-      'molest', 'mollify', 'momentary', 'momentous', 'momentum', 'mongrel', 'monochrome', 'monogamy', 'monolingual', 'monolith', 
-      'monotone', 'monotony', 'monsoon', 'montage', 'monumental', 'mope', 'morbid', 'mores', 'moribund', 'morphine', 
-      'mortality', 'mortar', 'mortgage', 'mortuary', 'mosaic', 'motif', 'motionless', 'motley', 'mound', 'mousse', 
-      'movable', 'muck', 'muddle', 'muffin', 'multilateral', 'multitude', 'mumble', 'mummy', 'mumps', 'mundane', 
-      'municipality', 'munitions', 'mural', 'muse', 'musk', 'mussel', 'muster', 'mutant', 'mutilate', 'muzzle', 
-      'myriad', 'mystic', 'mythology', 'nab', 'nag', 'namesake', 'nape', 'narcissus', 'nasal', 'nautical', 
-      'navel', 'Nazism', 'nebulous', 'necessitate', 'nectar', 'negate', 'negligent', 'negligible', 'negotiable', 'neoclassical', 
-      'neon', 'nestle', 'neural', 'neurological', 'neurosis', 'neurotic', 'newsreel', 'nib', 'nibble', 'nicely', 
-      'niche', 'nicotine', 'nigger', 'nigh', 'nimble', 'nip', 'nipple', 'nirvana', 'nitrate', 'node', 
-      'nomad', 'nomadic', 'nominal', 'nominee', 'nonchalant', 'nonetheless', 'nonstop', 'Nordic', 'norm', 'nostalgia', 
-      'nostalgic', 'notary', 'notation', 'notification', 'notoriety', 'notwithstanding', 'nought', 'novelty', 'novice', 'nuance', 
-      'nucleus', 'nude', 'nudge', 'nudity', 'numb', 'nurture', 'nutrient', 'nuzzle', 'nymph', 'oasis', 
-      'obese', 'obesity', 'obituary', 'obligatory', 'obliterate', 'oblivion', 'oboe', 'obscene', 'obscenity', 'obscurity', 
-      'observance', 'observant', 'obsess', 'obsessive', 'obsolete', 'occidental', 'occupancy', 'oceanography', 'octopus', 'odds', 
-      'ode', 'offensive', 'offhand', 'ointment', 'omega', 'ominous', 'omniscient', 'oncoming', 'ongoing', 'onomatopoeia', 
-      'onset', 'onslaught', 'ooze', 'opal', 'opaque', 'operational', 'operative', 'opt', 'optimum', 'opulent', 
-      'opus', 'oracle', 'orator', 'orbital', 'orchestrate', 'orchid', 'ordain', 'ordinal', 'ordinance', 'orgasm', 
-      'orgy', 'orientation', 'ornate', 'orthodoxy', 'oscillation', 'ostensibly', 'ostentatious', 'oust', 'outcast', 'outcry', 
-      'outfit', 'outgoing', 'outgrow', 'outlandish', 'outlay', 'outnumber', 'outpost', 'outreach', 'outright', 'outspoken', 
-      'outweigh', 'ovation', 'overboard', 'overly', 'override', 'overshadow', 'oversight', 'overstate', 'overt', 'overture', 
-      'overview', 'ovum', 'oxidize', 'pacify', 'paddy', 'padlock', 'pagan', 'pageant', 'painstaking', 'pal', 
-      'palatable', 'palatal', 'palate', 'palette', 'palpable', 'pamper', 'panacea', 'pancake', 'pang', 'panoramic', 
-      'pant', 'panther', 'pantomime', 'par', 'parable', 'paradigm', 'paradoxical', 'paraffin', 'paralysis', 'paralytic', 
-      'parameter', 'paramilitary', 'paramount', 'paranoia', 'paranoid', 'parasite', 'pare', 'parentage', 'parenthetical', 'parody', 
-      'parole', 'parry', 'parsley', 'parson', 'partake', 'partiality', 'partisan', 'pasta', 'pastel', 'pastoral', 
-      'patchy', 'pathology', 'pathologic', 'patio', 'patriarch', 'patriarchal', 'patronage', 'patter', 'pawn', 'pawn', 
-      'payout', 'payroll', 'peat', 'pedagogic', 'pedantic', 'pedestal', 'pedigree', 'peek', 'pelican', 'penalize', 
-      'pending', 'penis', 'pensioner', 'pentathlon', 'penthouse', 'peppermint', 'perceptible', 'perception', 'perceptive', 'percussion', 
-      'perfunctory', 'perilous', 'perimeter', 'periodic', 'peripheral', 'periphery', 'perish', 'perjury', 'perk', 'permeate', 
-      'permissible', 'pernicious', 'perpetrate', 'perpetrator', 'perpetuate', 'personage', 'personify', 'pertain', 'pertinent', 'perturb', 
-      'pervade', 'pervert', 'pervert', 'pester', 'pesticide', 'phantom', 'pharmaceutical', 'pheasant', 'phenomenal', 'philanthropic', 
-      'phonology', 'phosphorous', 'phosphorus', 'physiotherapy', 'physique', 'picket', 'pickle', 'pidgin', 'pier', 'piety', 
-      'pigsty', 'pike', 'pinch', 'pinpoint', 'piracy', 'piss', 'piston', 'pitcher', 'pitfall', 'pivot', 
-      'pivotal', 'plaid', 'plaintiff', 'planetary', 'plank', 'plaque', 'plasma', 'plaster', 'platoon', 'playoff', 
-      'plea', 'plead', 'pleat', 'plenipotentiary', 'plight', 'plumb', 'plummet', 'plunger', 'plush', 'plutonium', 
-      'poach', 'pockmark', 'poignant', 'polarity', 'polemic', 'polio', 'pollen', 'pollster', 'polyester', 'pompous', 
-      'poplar', 'poppy', 'populous', 'pore', 'portfolio', 'posthumous', 'postscript', 'postulate', 'posture', 'potency', 
-      'potent', 'potluck', 'pouch', 'pounce', 'practicality', 'pragmatic', 'precarious', 'precinct', 'precipitate', 'precipitous', 
-      'preclude', 'predatory', 'predicament', 'prefabricate', 'preferential', 'premature', 'première', 'premium', 'premonition', 'prenatal', 
-      'preoccupied', 'prerequisite', 'preschool', 'presidium', 'pressing', 'presume', 'presumption', 'presuppose', 'pretentious', 'prevalent', 
-      'prism', 'pristine', 'pro', 'pro', 'probation', 'procedural', 'procure', 'prod', 'prodigal', 'prodigy', 
-      'profess', 'profiteer', 'projection', 'proliferation', 'prolific', 'prologue', 'prominence', 'prone', 'propagate', 'propel', 
-      'prophecy', 'prophesy', 'proponent', 'proposition', 'prospective', 'prostate', 'protagonist', 'protocol', 'prototype', 'protracted', 
-      'protrude', 'provident', 'provisional', 'prowess', 'proximity', 'prudent', 'pseudo', 'psychiatrist', 'psycho', 'psychoanalyst', 
-      'psychotherapist', 'psychotherapy', 'puberty', 'pullover', 'pulpit', 'pun', 'pungent', 'punitive', 'purely', 'purge', 
-      'purport', 'python', 'quadrangle', 'quadrant', 'quadratic', 'quadrilateral', 'quadruple', 'quail', 'quail', 'quaint', 
-      'Quaker', 'qualifier', 'qualm', 'quantifier', 'quantum', 'quarantine', 'quartet', 'quartz', 'quash', 'quaver', 
-      'quell', 'quench', 'querulous', 'quibble', 'quick', 'quicksand', 'quintessence', 'quintet', 'quip', 'quirk', 
-      'quitter', 'quiver', 'quixotic', 'quizzical', 'quotient', 'rabbi', 'rabid', 'rabies', 'racer', 'racket', 
-      'racketeer', 'radiance', 'radiant', 'raffle', 'raft', 'raft', 'raiser', 'rake', 'RAM', 'ramble', 
-      'rambler', 'ramification', 'rampage', 'rampant', 'rampart', 'rancid', 'rancour', 'randy', 'ranger', 'rap', 
-      'rapist', 'rapport', 'rapprochement', 'rapt', 'rapture', 'rarity', 'rasp', 'rateable', 'rationale', 'rationalize', 
-      'rattle', 'ravine', 'ravish', 'reaffirm', 'rearguard', 'rearmament', 'reassure', 'rebate', 'rebound', 'recapture', 
-      'recipient', 'reciprocate', 'reciprocity', 'recline', 'recompense', 'reconciliation', 'recount', 'recount', 'recoup', 'recourse', 
-      'rectification', 'rectify', 'rectitude', 'rector', 'recur', 'recurrent', 'redbrick', 'redemption', 'redemptive', 'redolent', 
-      'redraw', 'redress', 'reductio', 'redundancy', 'redundant', 'reedy', 'referendum', 'refurbish', 'refutation', 'regal', 
-      'regarding', 'regatta', 'regeneration', 'regent', 'registrar', 'registry', 'regress', 'regression', 'regressive', 'regret', 
-      'regularity', 'reimburse', 'rein', 'reinstate', 'rejuvenate', 'relapse', 'relegate', 'relent', 'relentless', 'relinquish', 
-      'relish', 'remedial', 'remembrance', 'reminiscent', 'remission', 'remit', 'remittance', 'remnant', 'remorse', 'remorseful', 
-      'remorseless', 'remunerate', 'remuneration', 'rend', 'rendezvous', 'rendition', 'renegade', 'renown', 'renunciation', 'reorient', 
-      'reparation', 'repellent', 'repentance', 'repercussion', 'repertoire', 'repine', 'replenish', 'replica', 'replicate', 'repository', 
-      'repress', 'repression', 'repressive', 'reprimand', 'reprisal', 'reprove', 'repudiate', 'repugnant', 'repulse', 'repulsion', 
-      'repulsive', 'reputable', 'repute', 'requiem', 'requisite', 'requisition', 'reservist', 'reshape', 'reshuffle', 'resigned', 
-      'resilience', 'resin', 'resinous', 'resounding', 'respectability', 'respite', 'resplendent', 'restful', 'restitution', 'resultant', 
-      'resumption', 'resurgent', 'resurrect', 'resurrection', 'resuscitation', 'retainer', 'retaliate', 'retard', 'retention', 'reticent', 
-      'retribution', 'retrievable', 'retrieval', 'retrieve', 'retrospect', 'retrospective', 'revamp', 'revel', 'revere', 'reverence', 
-      'reverend', 'reverent', 'reverie', 'reversion', 'revert', 'revoke', 'revulsion', 'rhinoceros', 'ribald', 'rickets', 
-      'rickety', 'rickshaw', 'rift', 'rig', 'rig', 'righteous', 'rigorous', 'rind', 'rink', 'rinse', 
-      'rivet', 'roach', 'robust', 'rocker', 'rodent', 'rodeo', 'roger', 'rookie', 'roost', 'rooster', 
-      'rosette', 'rostrum', 'rota', 'rotor', 'rouge', 'roughen', 'roulette', 'rounders', 'roundup', 'rouse', 
-      'rove', 'rover', 'rowdy', 'royalist', 'rubble', 'rubdown', 'rucksack', 'ruckus', 'ruddy', 'rudimentary', 
-      'rue', 'rue', 'rueful', 'ruffian', 'ruffle', 'rugger', 'ruinous', 'ruling', 'rum', 'rumble', 
-      'rummage', 'rupture', 'russet', 'rustle', 'rut', 'Sabbath', 'sabbatical', 'sabotage', 'saboteur', 'sabre', 
-      'sacrament', 'sacrilegious', 'sadism', 'safari', 'saffron', 'sag', 'saga', 'sagacious', 'sagacity', 'sage', 
-      'sailcloth', 'salient', 'saline', 'salivary', 'salivate', 'sallow', 'sallow', 'salutary', 'salvage', 'salvo', 
-      'samba', 'sanctification', 'sanctify', 'sanctuary', 'sanctum', 'sanguine', 'sap', 'sardonic', 'sarong', 'sartorial', 
-      'sash', 'sash', 'satanic', 'satiate', 'satiation', 'satyr', 'savagery', 'savant', 'saxophone', 'scab', 
-      'scaffold', 'scallop', 'scalpel', 'scanty', 'scaremonger', 'scary', 'scathing', 'scatterbrain', 'scavenge', 'scavenger', 
-      'scenario', 'schema', 'schematize', 'schizophrenia', 'scholarly', 'scholastic', 'scintillation', 'scoff', 'scoff', 'scoring', 
-      'scour', 'scowl', 'scrawl', 'scrawny', 'screech', 'scribe', 'scripture', 'scrounge', 'scrub', 'scrum', 
-      'scruple', 'scrupulous', 'scuba', 'scuffle', 'scum', 'scupper', 'scurf', 'scurry', 'scuttle', 'scuttle', 
-      'secession', 'seclude', 'secluded', 'secrete', 'secretive', 'sectarian', 'sedan', 'sedative', 'seduce', 'seductive', 
-      'seduction', 'seedy', 'seep', 'seethe', 'segregate', 'segregation', 'selenium', 'semantic', 'semantics', 'semblance', 
-      'seminal', 'senatorial', 'senile', 'senility', 'sensor', 'sensory', 'sensual', 'sensuous', 'sentinel', 'sentry', 
-      'sepulchre', 'sequel', 'serenade', 'serf', 'serrated', 'serum', 'serviceable', 'servile', 'servility', 'servitude', 
-      'severity', 'sexism', 'sexist', 'shack', 'shag', 'shaggy', 'sham', 'shamble', 'shanghai', 'shapely', 
-      'shatter', 'sheaf', 'shear', 'sheath', 'sheen', 'sheepish', 'shimmer', 'shin', 'shirk', 'shoal', 
-      'shoal', 'shoddy', 'shortchange', 'shortfall', 'shove', 'showpiece', 'showy', 'shred', 'shrew', 'shrinkage', 
-      'shrivel', 'shroud', 'shrubbery', 'shrubby', 'shuffle', 'shun', 'shunt', 'sibling', 'sic', 'sickbay', 
-      'sickening', 'sideline', 'sidestep', 'sidle', 'sierra', 'sighting', 'signet', 'silage', 'silhouette', 'silica', 
-      'silo', 'silt', 'simmer', 'simpleton', 'simulate', 'sinew', 'singe', 'sinuous', 'sip', 'siphon', 
-      'sirloin', 'sizeable', 'sizzle', 'skid', 'skimmer', 'skinny', 'skipper', 'slab', 'slag', 'slanderous', 
-      'slangy', 'slash', 'slat', 'slavish', 'sleazy', 'sleek', 'sleeper', 'slick', 'slime', 'slimnastics', 
-      'slimy', 'slink', 'slit', 'slither', 'sliver', 'slop', 'slouch', 'slug', 'slug', 'slump', 
-      'slur', 'slurry', 'smother', 'smug', 'snag', 'snare', 'snarl', 'sniffle', 'snigger', 'snipe', 
-      'sniper', 'snivel', 'snooty', 'snorkel', 'snort', 'snout', 'snub', 'snuff', 'sobriety', 'sod', 
-      'soggy', 'sol', 'solace', 'solemnity', 'soliloquy', 'solvency', 'solvent', 'sombre', 'sonar', 'sonata', 
-      'sophist', 'soprano', 'sordid', 'sortie', 'spar', 'spar', 'sparingly', 'spasm', 'spasmodic', 'spate', 
-      'spatial', 'spatter', 'speckle', 'spectre', 'spectrum', 'spew', 'spindle', 'spinner', 'spire', 'spirituality', 
-      'spleen', 'splutter', 'spook', 'sporadic', 'spore', 'spout', 'sprawl', 'sprint', 'spurious', 'squabble', 
-      'squalid', 'squall', 'squalor', 'squash', 'squash', 'squawk', 'squeak', 'squeal', 'squeamish', 'squint', 
-      'squire', 'squirm', 'squirt', 'staccato', 'stag', 'staid', 'stalemate', 'stalk', 'stallion', 'stalwart', 
-      'stamina', 'stampede', 'stance', 'standing', 'stanza', 'starboard', 'stardom', 'stark', 'stately', 'stealth', 
-      'stealthily', 'steely', 'steep', 'stereotype', 'sterilize', 'steroid', 'stethoscope', 'stile', 'stimulant', 'stint', 
-      'stipend', 'stipulate', 'stirrup', 'stoic', 'stoical', 'stoke', 'stoppage', 'stow', 'straddle', 'straggle', 
-      'strained', 'straitlaced', 'strand', 'stratify', 'stratum', 'strenuous', 'stressful', 'strew', 'stricture', 'strident', 
-      'stringent', 'strontium', 'strut', 'strut', 'stub', 'stubble', 'studious', 'stuffy', 'stupefaction', 'stupendous', 
-      'stupor', 'subjection', 'subjectivity', 'sublime', 'subside', 'substantiate', 'substantive', 'subtlety', 'suburbanite', 'subversion', 
-      'subversive', 'subvert', 'succour', 'succulent', 'succumb', 'suction', 'sufferable', 'sufferance', 'suffice', 'suffrage', 
-      'suitor', 'sulk', 'sully', 'sulphurous', 'sultan', 'sultry', 'sumptuous', 'sundry', 'sunken', 'superfluous', 
-      'superimpose', 'superintend', 'supersede', 'supplant', 'supple', 'supplementary', 'supposition', 'supremacy', 'surcharge', 'surly', 
-      'surreal', 'surrealist', 'surreptitious', 'surrogate', 'susceptible', 'susceptibility', 'sustenance', 'swagger', 'swap', 'swathe', 
-      'sweeping', 'swine', 'swipe', 'swirl', 'swivel', 'swoop', 'syllabic', 'synagogue', 'syndicate', 'synonymous', 
-      'synopsis', 'synoptic', 'syntactic', 'syphilis', 'tab', 'tacit', 'tacitly', 'taciturn', 'tacky', 'tact', 
-      'tactful', 'tactician', 'taffeta', 'tailplane', 'taint', 'takings', 'tamper', 'tangent', 'tanner', 'tannic', 
-      'tantamount', 'tantrum', 'taper', 'tapeworm', 'tarnish', 'tarry', 'tarry', 'tartan', 'tartly', 'tatters', 
-      'tattooist', 'taunt', 'taut', 'tawdry', 'teak', 'technicality', 'technocracy', 'tedium', 'teeter', 'telling', 
-      'tempo', 'temporal', 'tendon', 'tenet', 'tenor', 'tensile', 'tentative', 'tenuous', 'tenure', 'tepid', 
-      'terrain', 'terrestrial', 'terry', 'terse', 'testator', 'tether', 'textual', 'thatch', 'thee', 'thematic', 
-      'theorem', 'therapeutic', 'therein', 'thereto', 'thereupon', 'therewith', 'thermocouple', 'thermodynamics', 'thermonuclear', 'thicket', 
-      'thistle', 'threadbare', 'thrice', 'throb', 'throttle', 'throughput', 'thud', 'thug', 'thump', 'thunderclap', 
-      'thunderous', 'thy', 'thyroid', 'tiara', 'tilt', 'timely', 'tinder', 'tinge', 'tingle', 'tinker', 
-      'tinny', 'tint', 'tirade', 'titan', 'titanic', 'tom', 'tonal', 'tongs', 'tonic', 'topographer', 
-      'torrid', 'torsion', 'torso', 'totalitarian', 'totalitarianism', 'totter', 'tout', 'tract', 'tractable', 'tragedian', 
-      'trait', 'trample', 'trance', 'transcend', 'transcendental', 'transcribe', 'transfigure', 'transfuse', 'transient', 'transitory', 
-      'translucent', 'transmutation', 'transmute', 'transpire', 'transpose', 'transposition', 'trauma', 'traverse', 'trawler', 'treachery', 
-      'treatise', 'treble', 'trek', 'tremor', 'trespass', 'trestle', 'tributary', 'trill', 'trilogy', 'trinket', 
-      'tripod', 'tripper', 'trivia', 'trounce', 'truce', 'trudge', 'trump', 'trundle', 'trying', 'tryout', 
-      'tuba', 'tubular', 'tuft', 'tulip', 'tumultuous', 'turbid', 'turbine', 'turbot', 'turmoil', 'turner', 
-      'turning', 'turnout', 'turret', 'tutelage', 'tweed', 'twirl', 'twitch', 'typography', 'tyrannical', 'tyrannize', 
-      'ubiquitous', 'ulcer', 'ulterior', 'ultrasonic', 'ultrasound', 'umpire', 'unabashed', 'unabated', 'unassuming', 'unawares', 
-      'unbecoming', 'uncanny', 'unceremonious', 'uncharitable', 'uncouth', 'underbrush', 'undercharge', 'undercut', 'underdog', 'underdone', 
-      'undergrowth', 'underhand', 'underlie', 'underling', 'undersell', 'understate', 'understudy', 'underwrite', 'undulate', 'unduly', 
-      'uneconomic', 'unequivocal', 'unfailing', 'unfathomable', 'unforeseen', 'ungainly', 'ungodly', 'ungracious', 'ungrateful', 'unicorn', 
-      'unilateral', 'unintelligible', 'uninviting', 'unison', 'unkempt', 'unleash', 'unlisted', 'unnerve', 'unobtrusive', 'unorthodox', 
-      'unpalatable', 'unparalleled', 'unpretentious', 'unprincipled', 'unravel', 'unrelenting', 'unremitting', 'unruly', 'unscrew', 'unseemly', 
-      'unsettle', 'unsettled', 'unsightly', 'unsuspecting', 'unswerving', 'untenable', 'untold', 'untouchable', 'untruth', 'unwieldy', 
-      'unwind', 'unwitting', 'unworldly', 'upcoming', 'upfront', 'upheaval', 'upholster', 'upkeep', 'uplift', 'upmarket', 
-      'uprising', 'upstart', 'upstream', 'upsurge', 'uranium', 'urinate', 'usurer', 'usurp', 'utilitarian', 'Utopia', 
-      'vagabond', 'vagrant', 'valet', 'validate', 'valve', 'vandal', 'vandalism', 'vanguard', 'vanilla', 'vanquish', 
-      'vantage', 'variant', 'varicose', 'vat', 'vault', 'veal', 'veer', 'vehement', 'velocity', 'venerable', 
-      'venerate', 'venereal', 'vengeance', 'vengeful', 'venison', 'venom', 'venomous', 'ventral', 'ventricle', 'ventricular', 
-      'verbatim', 'verdure', 'veritable', 'vermin', 'vernacular', 'vernal', 'versatility', 'verse', 'vertebrate', 'vertex', 
-      'verve', 'vestige', 'vet', 'vex', 'vexation', 'vexatious', 'viable', 'vial', 'vicarage', 'vicarious', 
-      'vicariously', 'vicinity', 'victimize', 'vie', 'vigil', 'vignette', 'vile', 'villainous', 'vindicate', 'vindictive', 
-      'viola', 'viral', 'virile', 'virtuous', 'virulent', 'visage', 'viscera', 'viscount', 'visitation', 'vista', 
-      'visualize', 'vitalize', 'vivacity', 'vocalist', 'vocalization', 'vocally', 'vocative', 'vodka', 'vogue', 'void', 
-      'volatile', 'volatility', 'volitional', 'voluble', 'voluminous', 'vortex', 'vulgarity', 'vulture', 'waddle', 'wade', 
-      'wafer', 'wag', 'wail', 'waistcoat', 'waive', 'wallow', 'wand', 'wane', 'wanton', 'wares', 
-      'warp', 'warranty', 'wary', 'watermark', 'watery', 'waver', 'wayward', 'wean', 'wedge', 'weighty', 
-      'weird', 'whack', 'whiff', 'whimsical', 'whirlwind', 'whisk', 'whiten', 'whitewash', 'whizz', 'whoop', 
-      'wicked', 'wicker', 'wield', 'wiggle', 'wilt', 'wily', 'wince', 'windfall', 'wisp', 'withstand', 
-      'wizard', 'wobble', 'woe', 'woeful', 'womanly', 'woo', 'wording', 'wrapper', 'wrath', 'wreathe', 
-      'wreckage', 'wrench', 'wrest', 'wriggle', 'wring', 'writhe', 'wry', 'xenophobia', 'yahoo', 'yank', 
-      'yeoman', 'yoga', 'yummy', 'yuppie', 'zany', 'zealot', 'zenith', 'zest', 'zionism', 'zoom', 
-      'zulu'
+      'abacus', 'abandon', 'abase', 'abash', 'abate', 'abbess', 'abbey', 'abbreviate', 'abbreviation', 'abdicate',
+      'abdomen', 'abdominal', 'abduct', 'abduction', 'abed', 'aberrant', 'aberration', 'abet', 'abeyance', 'abhor',
+      'abhorrence', 'abhorrent', 'abidance', 'abide', 'abiding', 'abject', 'abjure', 'ablaze', 'ablution', 'ably',
+      'abnegate', 'abnormal', 'abnormality', 'abode', 'abominable', 'abominate', 'abomination', 'aboriginal', 'aborigine', 'abort',
+      'aboveboard', 'abrade', 'abrasion', 'abrasive', 'abreast', 'abridge', 'abridgement', 'abrogate', 'abrupt', 'abscond',
+      'absence', 'absent', 'absentee', 'absolution', 'absolve', 'absorb', 'absorption', 'abstain', 'abstemious', 'abstention',
+      'abstinence', 'abstract', 'abstruse', 'absurd', 'abundance', 'abundant', 'abusive', 'abut', 'abyss', 'academic',
+      'academician', 'academy', 'accede', 'accelerate', 'acceleration', 'accentuate', 'access', 'accessible', 'accession', 'accessory',
+      'acclaim', 'acclimate', 'acclivity', 'accolade', 'accommodate', 'accompaniment', 'accompanist', 'accompany', 'accomplice', 'accomplish',
+      'accost', 'account', 'accountable', 'accountancy', 'accountant', 'accouter', 'accredit', 'accrue', 'accumulate', 'accursed',
+      'accusation', 'accusatory', 'accuse', 'accustomed', 'acerbic', 'acerbity', 'achromatic', 'acid', 'acidify', 'acknowledge',
+      'acme', 'acne', 'acoustic', 'acoustics', 'acquaint', 'acquaintance', 'acquainted', 'acquiesce', 'acquiescence', 'acquire',
+      'acquired', 'acquisition', 'acquit', 'acquittal', 'acreage', 'acrid', 'acrimony', 'actuality', 'actuary', 'actuate',
+      'acumen', 'acute', 'adamant', 'addendum', 'addictive', 'additive', 'addle', 'adduce', 'adept', 'adhere',
+      'adherence', 'adherent', 'adhesion', 'adhesive', 'adjoin', 'adjourn', 'adjudicate', 'adjunct', 'adjuration', 'adjustment',
+      'adjutant', 'administrator', 'admissible', 'admittance', 'admonish', 'admonition', 'adoration', 'adorn', 'adrift', 'adroit',
+      'adulate', 'adulatory', 'adulterant', 'adulterate', 'adultery', 'adumbrate', 'advantage', 'advantageous', 'advent', 'adversary',
+      'adverse', 'adversity', 'advert', 'advertiser', 'advisory', 'advocacy', 'advocate', 'aerate', 'aerial', 'aerobatics',
+      'aerobics', 'aerodynamics', 'aeronaut', 'aeronautics', 'aerosol', 'aerospace', 'aerostat', 'aesthetic', 'affable', 'affair',
+      'affectation', 'affected', 'affiliate', 'affiliation', 'affinity', 'affix', 'afflict', 'affluence', 'affluent', 'affray',
+      'affront', 'afield', 'afire', 'afloat', 'afoot', 'aforesaid', 'afresh', 'afterthought', 'agape', 'agglomerate',
+      'aggrandize', 'aggravate', 'aggravation', 'aggregate', 'aggress', 'aggressive', 'aggrieve', 'aggrieved', 'aghast', 'agile',
+      'agility', 'agitate', 'agitation', 'agnostic', 'agonizing', 'agrarian', 'agreement', 'aground', 'aids', 'ailing',
+      'ailment', 'airborne', 'airily', 'airlift', 'airstrip', 'airy', 'ajar', 'akin', 'alacrity', 'albeit',
+      'album', 'alchemy', 'alcohol', 'alcoholism', 'alcove', 'alderman', 'algae', 'algebra', 'alias', 'alibi',
+      'alien', 'alienable', 'alienate', 'alight', 'alight', 'align', 'aliment', 'alimentary', 'alimony', 'alkali',
+      'alkaloid', 'allah', 'allay', 'alleged', 'allegiance', 'allegory', 'allergic', 'allergy', 'alleviate', 'alley',
+      'alliance', 'allocate', 'allot', 'allotment', 'alloy', 'allude', 'allure', 'allusion', 'almanac', 'alms',
+      'aloof', 'altar', 'alter', 'alteration', 'altercation', 'alternate', 'alternative', 'altimeter', 'altitude', 'alto',
+      'altruism', 'altruist', 'altruistic', 'aluminum', 'aluminumal', 'alveolar', 'amalgamate', 'amass', 'amateur', 'amatory',
+      'ambassador', 'ambidextrous', 'ambience', 'ambiguous', 'ambitious', 'ambivalent', 'ambrosial', 'ambulance', 'ambulate', 'ambush',
+      'ameliorate', 'amenable', 'amend', 'amenity', 'amiable', 'amicable', 'amidst', 'amity', 'ammonia', 'amnesia',
+      'amnesty', 'amok', 'amoral', 'amorous', 'amorphous', 'amount', 'amour', 'ampere', 'amphibian', 'amphibious',
+      'amphitheater', 'ample', 'amplitude', 'amply', 'amputate', 'amusement', 'anachronism', 'anachronistic', 'anaerobic', 'anagram',
+      'anal', 'analogous', 'analogue', 'analogy', 'analysis', 'analyst', 'analyze', 'anarchic', 'anarchist', 'anarchy',
+      'anathema', 'anatomy', 'ancestry', 'ancillary', 'anecdote', 'anemia', 'anemometer', 'anesthetic', 'anew', 'angelic',
+      'angle', 'anglo', 'anguish', 'anhydrous', 'animadversion', 'animadvert', 'animate', 'animation', 'animosity', 'annalist',
+      'annals', 'annex', 'annihilate', 'annihilation', 'annotate', 'annual', 'annuity', 'anode', 'anomaly', 'anonymity',
+      'anonymous', 'antagonism', 'antagonist', 'antagonize', 'ante', 'antecede', 'antecedent', 'antedate', 'antediluvian', 'antelope',
+      'antemeridian', 'antemundane', 'antenatal', 'antenna', 'anterior', 'anthology', 'anthropoid', 'anthropologist', 'anthropology', 'antibiotics',
+      'antibody', 'anticipate', 'anticlimax', 'anticyclone', 'antidote', 'antilogarithm', 'antilogy', 'antipathy', 'antipodes', 'antiquarian',
+      'antiquary', 'antiquate', 'antique', 'antiseptic', 'antitoxin', 'antler', 'antonym', 'anus', 'anxious', 'apace',
+      'apartheid', 'apathetic', 'apathy', 'aperture', 'apex', 'aphorism', 'apiece', 'apogee', 'apology', 'apoplexy',
+      'apostasy', 'apostate', 'apothecary', 'apotheosis', 'appall', 'appalling', 'apparatus', 'apparel', 'apparent', 'apparition',
+      'appeal', 'appease', 'appellate', 'appellation', 'append', 'appendage', 'appendicitis', 'appendix', 'appertain', 'apposite',
+      'apposition', 'appraisal', 'appraise', 'appreciable', 'appreciate', 'apprehend', 'apprehensible', 'apprehension', 'apprehensive', 'apprentice',
+      'approbation', 'appropriate', 'approval', 'approximately', 'approximation', 'aptitude', 'aquarium', 'aquatic', 'aqueduct', 'aqueous',
+      'arbiter', 'arbitrary', 'arbitrate', 'arbor', 'arboreal', 'arboretum', 'arboriculture', 'arcade', 'archaeologist', 'archaeology',
+      'archaic', 'archbishop', 'archer', 'archetype', 'archipelago', 'archive', 'ardent', 'ardor', 'arduous', 'area',
+      'arguable', 'argumentation', 'arid', 'aristocracy', 'aristocrat', 'arithmetic', 'armada', 'armful', 'armory', 'armoury',
+      'aroma', 'aromatic', 'arraign', 'arrange', 'arrant', 'arrear', 'arrears', 'arrogant', 'arrogate', 'arsenal',
+      'arson', 'artery', 'artful', 'arthritis', 'articulate', 'artifact', 'artifice', 'artificial', 'artisan', 'artistic',
+      'artistry', 'artless', 'ascendant', 'ascent', 'ascertain', 'ascetic', 'ascribe', 'asexual', 'ashen', 'asinine',
+      'askance', 'askew', 'asperity', 'aspirant', 'aspiration', 'aspire', 'assail', 'assailant', 'assassin', 'assassinate',
+      'assay', 'assemble', 'assent', 'assert', 'assertion', 'assertive', 'assess', 'assessor', 'assiduity', 'assiduous',
+      'assignee', 'assimilate', 'assimilation', 'assonance', 'assonant', 'assonate', 'assorted', 'assortment', 'assuage', 'assurance',
+      'asterisk', 'asthma', 'astound', 'astounding', 'astral', 'astray', 'astringent', 'astrology', 'astrophysics', 'astute',
+      'asylum', 'asymmetric', 'atheism', 'athirst', 'athwart', 'atom', 'atone', 'atonement', 'atrocious', 'atrocity',
+      'attache', 'attenuate', 'attest', 'attraction', 'attribute', 'attrition', 'atypical', 'auburn', 'auctioneer', 'audacious',
+      'audacity', 'audible', 'audition', 'auditory', 'augment', 'augur', 'august', 'aura', 'aural', 'auricle',
+      'auricular', 'aurora', 'auspice', 'auspicious', 'austere', 'austerity', 'autarchy', 'authentic', 'authenticity', 'authoritarian',
+      'autobiography', 'autocracy', 'autocrat', 'autocratic', 'autograph', 'automaton', 'autonomous', 'autonomy', 'autopsy', 'autumnal',
+      'auxiliary', 'avail', 'avalanche', 'avant', 'avarice', 'averse', 'aversion', 'avert', 'aviary', 'avid',
+      'avidity', 'avocation', 'avow', 'avuncular', 'awesome', 'awkward', 'awry', 'axis', 'babble', 'bacchanalia',
+      'backbiting', 'backbreaking', 'backdate', 'backdrop', 'backfire', 'backhand', 'backside', 'backstage', 'backwater', 'bacteria',
+      'bacterium', 'badger', 'badger', 'baffle', 'bailiff', 'balance', 'baldness', 'bale', 'baleful', 'balk',
+      'ballad', 'ballast', 'ballerina', 'ballistics', 'balm', 'balmy', 'balustrade', 'banal', 'bandwagon', 'bane',
+      'banish', 'banjo', 'banter', 'barbarian', 'baritone', 'barometer', 'baroque', 'barrage', 'barrel', 'barren',
+      'barricade', 'barring', 'barrister', 'barrow', 'barter', 'base', 'bash', 'bashful', 'bask', 'bass',
+      'bastion', 'baton', 'battalion', 'battery', 'bauble', 'bauxite', 'bawdy', 'bawl', 'bayonet', 'bazaar',
+      'beaker', 'beam', 'bearing', 'beastly', 'beatific', 'beatify', 'beating', 'beatitude', 'beau', 'beautify',
+      'becalm', 'beck', 'beckon', 'bedaub', 'bedeck', 'bedlam', 'befog', 'befriend', 'befuddle', 'beget',
+      'begrudge', 'beguile', 'behold', 'belabor', 'belated', 'belay', 'beleaguer', 'belie', 'belief', 'belittle',
+      'belle', 'bellicose', 'belligerent', 'bemoan', 'bemused', 'benchmark', 'benediction', 'benefactor', 'beneficence', 'beneficent',
+      'beneficiary', 'benevolence', 'benevolent', 'benign', 'benignant', 'benignity', 'benison', 'bequeath', 'bequest', 'berate',
+      'bereave', 'bereaved', 'bereft', 'berth', 'beseech', 'beset', 'besmear', 'besmirch', 'bestial', 'bestrew',
+      'bestride', 'bethink', 'betide', 'betimes', 'betrothal', 'bewilder', 'bewitch', 'biased', 'bibliography', 'bibliomania',
+      'bibliophile', 'bibulous', 'bicker', 'bide', 'biennial', 'bifocals', 'bigamist', 'bigamy', 'bight', 'bigot',
+      'bilateral', 'bile', 'bilingual', 'bilk', 'billiards', 'billion', 'billow', 'binge', 'bingo', 'biodegradable',
+      'biography', 'biology', 'bipartisan', 'biped', 'birthright', 'bisect', 'bitch', 'bizarre', 'blackmail', 'blackout',
+      'blanch', 'bland', 'blandishment', 'blare', 'blase', 'blaspheme', 'blatant', 'blaze', 'blazon', 'bleak',
+      'bleep', 'blemish', 'blight', 'bliss', 'blithe', 'blithesome', 'blitz', 'blizzard', 'blob', 'blockade',
+      'blockbuster', 'blotter', 'blues', 'blunder', 'blunt', 'blur', 'blurb', 'blurt', 'boatswain', 'bobsleigh',
+      'body', 'boggle', 'bogus', 'boiling', 'boisterous', 'bole', 'bolster', 'bombard', 'bombardier', 'bombast',
+      'bombshell', 'bona', 'bonanza', 'bond', 'bonfire', 'bonnet', 'booby', 'boon', 'boorish', 'boost',
+      'bootleg', 'booze', 'borough', 'bosom', 'botanical', 'botanize', 'botany', 'bounce', 'bountiful', 'bounty',
+      'bout', 'boutique', 'bowdlerize', 'bowler', 'boycott', 'brace', 'brae', 'brag', 'braggadocio', 'braggart',
+      'braid', 'braille', 'brainwash', 'branch', 'brandish', 'brash', 'bravado', 'bravo', 'bray', 'braze',
+      'brazier', 'breach', 'breakdown', 'breech', 'brethren', 'brevity', 'bridal', 'bridge', 'bridle', 'brief',
+      'brigade', 'brigadier', 'brigand', 'brightness', 'brine', 'bristle', 'briton', 'brittle', 'broccoli', 'broke',
+      'broker', 'brokerage', 'bronchitis', 'bronchus', 'brooch', 'brothel', 'brotherhood', 'browbeat', 'browser', 'brunette',
+      'brunt', 'brusque', 'brutish', 'bucolic', 'buddy', 'budge', 'buff', 'buffer', 'buffoon', 'buffoonery',
+      'buggy', 'bulbous', 'bulge', 'bulk', 'bulky', 'bullheaded', 'bullock', 'bulwark', 'bumper', 'bumptious',
+      'bungle', 'bunk', 'bunker', 'buoyancy', 'buoyant', 'bureau', 'bureaucracy', 'burgeon', 'burgher', 'burning',
+      'burnish', 'burrow', 'bursar', 'bustle', 'butane', 'butt', 'butte', 'buttock', 'buttress', 'buzz',
+      'bygone', 'bypass', 'cabal', 'cabaret', 'cabinet', 'cache', 'cackle', 'cacophonous', 'cacophony', 'cadaver',
+      'cadaverous', 'cadence', 'cadent', 'cadenza', 'caitiff', 'cajole', 'cajolery', 'calamity', 'calculable', 'calculating',
+      'calculus', 'callosity', 'callous', 'callow', 'calorie', 'calumniate', 'calumny', 'calvinism', 'camaraderie', 'cameo',
+      'camouflage', 'campaign', 'canary', 'cancellation', 'cancer', 'candid', 'candidate', 'candor', 'canine', 'cannibal',
+      'canny', 'canoe', 'canon', 'canonical', 'canopy', 'cant', 'cantankerous', 'cantata', 'canter', 'canto',
+      'cantonment', 'canvass', 'capacious', 'capacitor', 'cape', 'cape', 'capillary', 'capitulate', 'caprice', 'capricious',
+      'capsize', 'caption', 'captious', 'captivate', 'captivity', 'carat', 'carbohydrate', 'carbon', 'carcass', 'cardiac',
+      'cardinal', 'caress', 'caricature', 'carnage', 'carnal', 'carnation', 'carnivore', 'carnivorous', 'carouse', 'carp',
+      'carrion', 'cartilage', 'cartographer', 'cartridge', 'cascade', 'cashmere', 'caste', 'castigate', 'casual', 'casualty',
+      'catabolism', 'cataclysm', 'catalog', 'catalogue', 'catalyst', 'cataract', 'catastrophe', 'catastrophic', 'catcall', 'catchword',
+      'catchy', 'categorical', 'cathartic', 'cathode', 'catholicism', 'catholicity', 'catwalk', 'caucus', 'causal', 'caustic',
+      'cauterize', 'cavern', 'caviar', 'cavil', 'cavity', 'cedar', 'cede', 'celebrate', 'celebrated', 'celebrity',
+      'celerity', 'celestial', 'celibacy', 'celibate', 'cell', 'censor', 'censorious', 'censorship', 'censure', 'census',
+      'centenary', 'center', 'centiliter', 'centipede', 'centrist', 'centurion', 'cereal', 'cerebellum', 'cerebral', 'cerebration',
+      'ceremonial', 'ceremonious', 'certify', 'certitude', 'cessation', 'cession', 'cesspit', 'chagrin', 'chalet', 'champion',
+      'chant', 'chaos', 'chaplain', 'characteristic', 'characterize', 'charge', 'charisma', 'charismatic', 'charlatan', 'charming',
+      'chart', 'charter', 'charwoman', 'chasm', 'chaste', 'chastise', 'chastity', 'chateau', 'chattel', 'chauvinism',
+      'checkmate', 'cherish', 'chic', 'chicanery', 'chieftain', 'chilly', 'chime', 'chimerical', 'chimpanzee', 'chirp',
+      'chisel', 'chivalry', 'chlorophyll', 'chloroplast', 'choir', 'cholera', 'choleric', 'cholesterol', 'choppy', 'choral',
+      'chord', 'choreography', 'christen', 'chromatic', 'chrome', 'chromosome', 'chronicle', 'chronological', 'chronology', 'chronometer',
+      'chubby', 'chuck', 'chum', 'churlish', 'churn', 'cilia', 'ciliate', 'cinder', 'cipher', 'circle',
+      'circuit', 'circuitous', 'circular', 'circulate', 'circulatory', 'circumference', 'circumlocution', 'circumnavigate', 'circumscribe', 'circumspect',
+      'circumstantial', 'circumvent', 'citadel', 'cite', 'clad', 'claimant', 'clairvoyance', 'clamber', 'clamorous', 'clan',
+      'clandestine', 'clarification', 'clarify', 'clarity', 'classify', 'clatter', 'claustrophobia', 'cleanliness', 'cleanse', 'cleavage',
+      'cleave', 'clemency', 'clergy', 'clich', 'cliche', 'clientele', 'climactic', 'clinch', 'clockwise', 'clog',
+      'clot', 'clothier', 'clump', 'clumsy', 'clutter', 'coagulant', 'coagulate', 'coalescence', 'coalition', 'coax',
+      'cobble', 'cobra', 'cocaine', 'cocky', 'coddle', 'code', 'codicil', 'coefficient', 'coerce', 'coercion',
+      'coercive', 'coexist', 'cogent', 'cogitate', 'cognate', 'cognitive', 'cognizant', 'coherent', 'cohesion', 'cohesive',
+      'coil', 'coincide', 'coincidence', 'collaborate', 'collaboration', 'collage', 'collagen', 'collapse', 'collate', 'colleague',
+      'collective', 'collegian', 'collide', 'collier', 'collision', 'colloid', 'colloquial', 'colloquialism', 'colloquy', 'collude',
+      'collusion', 'colon', 'colonize', 'colossal', 'colossus', 'colt', 'column', 'combination', 'combustible', 'combustion',
+      'comely', 'comestible', 'comestibles', 'comical', 'commandant', 'commemorate', 'commencement', 'commensurate', 'commentary', 'commentate',
+      'commingle', 'commiserate', 'commission', 'commit', 'commitment', 'commodious', 'commodity', 'commonplace', 'commotion', 'communicable',
+      'communicative', 'communion', 'communique', 'community', 'commute', 'comparable', 'comparative', 'comparison', 'compassionate', 'compatible',
+      'compatriot', 'compelling', 'compensate', 'competence', 'competitive', 'competitor', 'complacence', 'complacent', 'complaint', 'complaisance',
+      'complaisant', 'complement', 'complementary', 'complex', 'complexion', 'compliant', 'complicate', 'complication', 'complicity', 'compliment',
+      'component', 'comport', 'composed', 'composite', 'composure', 'compound', 'comprehend', 'comprehensible', 'comprehensive', 'compress',
+      'compressible', 'compression', 'comprise', 'compromise', 'compulsion', 'compulsory', 'compunction', 'concede', 'conceivable', 'concentration',
+      'concentric', 'conception', 'concerto', 'conciliate', 'conciliatory', 'concoct', 'concord', 'concordant', 'concupiscence', 'concur',
+      'concurrent', 'condemn', 'condensation', 'condense', 'condenser', 'condescend', 'condescending', 'conditional', 'condom', 'condone',
+      'conductor', 'conduit', 'confection', 'confederacy', 'confederate', 'confer', 'confession', 'confetti', 'confidant', 'confide',
+      'confidence', 'configuration', 'confinement', 'conflagration', 'conflate', 'conformity', 'confront', 'confrontation', 'congenial', 'congenital',
+      'congest', 'congested', 'congruent', 'coniferous', 'conjecture', 'conjugal', 'conjugation', 'conjure', 'connective', 'connoisseur',
+      'connotation', 'connote', 'conscientious', 'conscious', 'conscript', 'consecrate', 'consecutive', 'consensus', 'conservationist', 'conservative',
+      'considerable', 'consign', 'consignment', 'consistency', 'console', 'consortium', 'conspicuous', 'conspiracy', 'conspire', 'constancy',
+      'constant', 'constituent', 'constitute', 'constrain', 'constraint', 'constructive', 'consultant', 'consummate', 'contact', 'containerization',
+      'contemplate', 'contemplation', 'contemporary', 'contempt', 'contemptible', 'contemptuous', 'contend', 'contentious', 'contentment', 'contest',
+      'contestant', 'context', 'contingency', 'contingent', 'contingent', 'continuum', 'contort', 'contour', 'contraceptive', 'contract',
+      'contradict', 'contradictory', 'contrition', 'contrive', 'controversial', 'controversy', 'conundrum', 'conurbation', 'convene', 'convenient',
+      'conventional', 'converge', 'convergence', 'conversant', 'convert', 'convertible', 'convey', 'conviction', 'convoke', 'convoluted',
+      'convoy', 'convulse', 'cooling', 'coop', 'copious', 'cordial', 'cornea', 'cornet', 'corollary', 'coronation',
+      'coroner', 'corporal', 'corps', 'corpse', 'corpulent', 'corpus', 'correlate', 'corroborate', 'corrode', 'corrosion',
+      'corrugated', 'corrupt', 'cortex', 'cosmopolitan', 'counselor', 'countenance', 'counter', 'counteract', 'counterbalance', 'counterfeit',
+      'countermand', 'counterpoint', 'countless', 'coup', 'coup', 'courier', 'courtship', 'covenant', 'coverage', 'covert',
+      'covet', 'cowardice', 'cower', 'crackle', 'cram', 'cramp', 'cranky', 'crap', 'crass', 'crater',
+      'crave', 'craven', 'creak', 'crease', 'creation', 'credence', 'credentials', 'credibility', 'credible', 'credo',
+      'credulity', 'cremate', 'crematorium', 'creole', 'crepuscular', 'crescent', 'crest', 'crestfallen', 'cringe', 'crinkle',
+      'criticize', 'critique', 'croak', 'crockery', 'crook', 'crooked', 'crossbow', 'crotch', 'crucify', 'crude',
+      'crunch', 'crux', 'crypt', 'cryptic', 'crystal', 'crystallization', 'cube', 'cubic', 'cuckoo', 'cuddle',
+      'cudgel', 'cull', 'culminate', 'culmination', 'culpable', 'culprit', 'cult', 'cumbersome', 'cumulative', 'cupidity',
+      'curator', 'curd', 'curfew', 'curmudgeon', 'cursive', 'cursory', 'curt', 'curtail', 'curve', 'custard',
+      'custodian', 'cute', 'cutlery', 'cyberspace', 'cyclical', 'cylinder', 'cynic', 'cynical', 'cynicism', 'dacron',
+      'daffodil', 'daft', 'dainty', 'dais', 'daisy', 'dampen', 'damper', 'damsel', 'dandelion', 'dandy',
+      'dandy', 'dangle', 'dank', 'dapper', 'dappled', 'daredevil', 'darn', 'data', 'dated', 'daunt',
+      'dauntless', 'dawdle', 'deacon', 'deaden', 'deadlock', 'dearth', 'debacle', 'debase', 'debilitate', 'debit',
+      'debris', 'debug', 'debunk', 'debut', 'decadent', 'decagon', 'decay', 'decease', 'deceitful', 'deceive',
+      'decelerate', 'decency', 'decent', 'decimal', 'decimate', 'decipher', 'decisive', 'deckhand', 'declaim', 'decompose',
+      'decor', 'decorous', 'decorum', 'decoy', 'decrease', 'decrepit', 'decry', 'deduce', 'deduct', 'deductible',
+      'deem', 'deface', 'defame', 'defect', 'defendant', 'defer', 'deference', 'defiant', 'deficient', 'deficit',
+      'defile', 'defile', 'definite', 'definitive', 'deflate', 'defoliate', 'deform', 'defraud', 'defrost', 'deft',
+      'defunct', 'defuse', 'degenerate', 'degradation', 'degrade', 'degree', 'dehydrate', 'dehydration', 'deify', 'deity',
+      'dejected', 'delegate', 'deleterious', 'deliberate', 'deliberation', 'delimit', 'delineate', 'delirious', 'deliverance', 'delude',
+      'deluge', 'delusion', 'delve', 'demagoguery', 'demagogy', 'demean', 'demeanor', 'demented', 'demise', 'demo',
+      'demobilize', 'demographic', 'demography', 'demolish', 'demolition', 'demon', 'demonic', 'demonstrable', 'demonstrate', 'demote',
+      'demur', 'demure', 'denigrate', 'denim', 'denizen', 'denominate', 'denominator', 'denote', 'denounce', 'density',
+      'dent', 'dentistry', 'denude', 'deodorant', 'deplete', 'deplore', 'depopulate', 'deport', 'deportment', 'depose',
+      'depository', 'depot', 'depraved', 'deprecate', 'depreciate', 'depress', 'depth', 'deputation', 'derail', 'derange',
+      'derby', 'deregulate', 'derelict', 'deride', 'derision', 'derisive', 'derivative', 'derive', 'derogate', 'derogatory',
+      'derrick', 'descendent', 'descry', 'desegregate', 'desert', 'desertification', 'desiccant', 'desiccate', 'designate', 'desirous',
+      'desolate', 'despair', 'desperate', 'despicable', 'despoil', 'despondent', 'despotic', 'despotism', 'destination', 'destitute',
+      'destitution', 'destructive', 'desultory', 'detach', 'detachable', 'deter', 'deteriorate', 'determinate', 'determination', 'determiner',
+      'deterrent', 'detest', 'detonate', 'detour', 'detract', 'detrimental', 'devalue', 'devastate', 'deviant', 'deviate',
+      'deviation', 'devious', 'devoid', 'devolve', 'devour', 'devout', 'dexterity', 'diabetes', 'diabolical', 'diagnosis',
+      'diagnostic', 'diagonal', 'dialect', 'dialectic', 'diameter', 'diametrically', 'diaphanous', 'dice', 'dichotomy', 'dictatorial',
+      'dictum', 'didactic', 'diddle', 'diehard', 'dielectric', 'differ', 'difference', 'differentiate', 'differentiation', 'diffidence',
+      'diffident', 'diffusion', 'digest', 'digestion', 'digit', 'dignify', 'dignitary', 'dignity', 'digress', 'digression',
+      'dilapidate', 'dilapidated', 'dilate', 'dilatory', 'dilemma', 'dilettante', 'diligent', 'dilute', 'dimension', 'diminutive',
+      'dimple', 'dinghy', 'dingy', 'diocese', 'diode', 'diphthong', 'diplomat', 'diplomatic', 'dipper', 'dire',
+      'directive', 'disadvantage', 'disagreeable', 'disarray', 'disassociate', 'disastrous', 'disavow', 'disband', 'disburse', 'discern',
+      'discernible', 'discerning', 'discharge', 'disciple', 'discipline', 'disclaim', 'disclose', 'discomfit', 'disconcert', 'discontinue',
+      'discord', 'discount', 'discountenance', 'discourse', 'discourteous', 'discredit', 'discreet', 'discrepant', 'discrete', 'discretion',
+      'discretionary', 'discriminate', 'discus', 'disdain', 'disenchant', 'disengage', 'disentangle', 'disfigure', 'disguise', 'dishevel',
+      'disillusion', 'disinfect', 'disingenuous', 'disinterested', 'disjointed', 'disjunctive', 'dislocate', 'dislodge', 'dismantle', 'dismiss',
+      'dismissal', 'disorder', 'disorient', 'disparage', 'disparate', 'disparity', 'dispel', 'dispensable', 'dispensation', 'dispirited',
+      'displace', 'displacement', 'disposed', 'disprove', 'disregard', 'disrepute', 'disrespect', 'disrupt', 'dissect', 'dissemble',
+      'disseminate', 'dissension', 'dissent', 'dissentious', 'disservice', 'dissever', 'dissimilar', 'dissipate', 'dissipated', 'dissociate',
+      'dissolute', 'dissolve', 'dissonance', 'dissonant', 'dissuade', 'distance', 'distaste', 'distend', 'distill', 'distillation',
+      'distinction', 'distingusihed', 'distort', 'distraught', 'distressed', 'disturb', 'disunite', 'disuse', 'dither', 'ditto',
+      'ditty', 'diurnal', 'diverge', 'divergent', 'divers', 'diverse', 'diversify', 'diversion', 'diversity', 'divert',
+      'divest', 'divide', 'dividend', 'divine', 'divinity', 'divisible', 'division', 'divisive', 'divisor', 'divulge',
+      'docile', 'doctorate', 'doctrinaire', 'dogged', 'dogma', 'dogmatic', 'dogmatist', 'doldrums', 'dole', 'dole',
+      'doleful', 'dollop', 'domain', 'dome', 'domestic', 'domesticate', 'domesticity', 'domicile', 'dominance', 'dominant',
+      'dominate', 'domineer', 'domineering', 'donate', 'doodle', 'doomed', 'doomsday', 'dope', 'dormancy', 'dormant',
+      'dosage', 'dossier', 'dote', 'doting', 'dour', 'dowager', 'down', 'downgrade', 'downhearted', 'downhill',
+      'downplay', 'downright', 'downstream', 'downtime', 'dowry', 'drab', 'drainage', 'dramatic', 'drape', 'drapery',
+      'drastic', 'draught', 'drawl', 'dredge', 'dregs', 'drench', 'dressy', 'dribble', 'drily', 'dripping',
+      'drone', 'drool', 'drought', 'drowse', 'drowsy', 'drub', 'drudgery', 'dual', 'dubious', 'duchy',
+      'duct', 'ductile', 'duet', 'duff', 'dullard', 'dumbfound', 'dumpy', 'dunce', 'dune', 'dungarees',
+      'dungeon', 'dupe', 'duplicate', 'duplicity', 'duration', 'dusky', 'dustcart', 'dwarf', 'dwindle', 'dynamic',
+      'dynamics', 'dynamism', 'earl', 'earmark', 'earnest', 'earthen', 'earthenware', 'earthwork', 'earthworm', 'earthy',
+      'easel', 'eaves', 'eavesdrop', 'ebony', 'ebullience', 'ebullient', 'eccentric', 'eccentricity', 'echo', 'eclectic',
+      'eclipse', 'economic', 'economical', 'ecosystem', 'ecstasy', 'ecstatic', 'eczema', 'eddy', 'edge', 'edgy',
+      'edible', 'edict', 'edifice', 'edify', 'educe', 'eerie', 'efface', 'effectual', 'effeminate', 'effervescent',
+      'effete', 'efficacious', 'efficacy', 'effigy', 'effluent', 'effrontery', 'effulgence', 'effuse', 'effusion', 'effusive',
+      'egalitarian', 'egocentric', 'egoism', 'egoist', 'egotism', 'egregious', 'ejaculate', 'eject', 'elapse', 'elasticity',
+      'elated', 'electioneering', 'electorate', 'electrification', 'electrify', 'electrocute', 'electrode', 'electrolysis', 'electrolyte', 'electromagnet',
+      'electron', 'electroplate', 'electroscope', 'electrostatic', 'element', 'elemental', 'elevate', 'elevated', 'elicit', 'eligible',
+      'eliminate', 'elite', 'elliptical', 'elocution', 'elocutionist', 'elongate', 'elope', 'eloquence', 'elucidate', 'elude',
+      'elusive', 'emaciated', 'emanate', 'emancipate', 'emancipation', 'embankment', 'embargo', 'embarrass', 'embattle', 'embattled',
+      'embed', 'embellish', 'embezzle', 'embitter', 'emblem', 'embody', 'embolden', 'emboss', 'embrace', 'embroil',
+      'emend', 'emerge', 'emergence', 'emergency', 'emergent', 'emigrate', 'eminence', 'emir', 'emissary', 'emit',
+      'emollient', 'emotion', 'empathetic', 'empathy', 'emphasis', 'emphasize', 'empiricism', 'empower', 'emulate', 'enact',
+      'enamor', 'encampment', 'encase', 'enchant', 'enclave', 'encompass', 'encore', 'encounter', 'encroach', 'encumber',
+      'encyclopedia', 'endanger', 'endemic', 'endocrine', 'endorse', 'endue', 'endurable', 'endurance', 'endure', 'endways',
+      'energetic', 'energize', 'energy', 'enervate', 'enfeeble', 'enfold', 'enforce', 'enfranchise', 'engender', 'engrave',
+      'engross', 'engrossing', 'enhance', 'enigma', 'enigmatic', 'enlighten', 'enlist', 'enliven', 'enmity', 'ennoble',
+      'enormity', 'enormous', 'enrage', 'enrapture', 'ensconce', 'ensemble', 'enshrine', 'ensign', 'enslave', 'ensnare',
+      'ensue', 'ensure', 'entail', 'entangle', 'enterprise', 'enthrall', 'enthrone', 'enthusiast', 'enthusiastic', 'entice',
+      'entity', 'entourage', 'entrance', 'entreat', 'entreaty', 'entree', 'entrench', 'entrust', 'entwine', 'enumerate',
+      'enviable', 'enzyme', 'ephemeral', 'epicure', 'epidemic', 'epidermis', 'epigram', 'episode', 'epistolary', 'epitaph',
+      'epitome', 'epitomize', 'equable', 'equality', 'equanimity', 'equate', 'equation', 'equestrian', 'equiangular', 'equidistant',
+      'equilateral', 'equilibrium', 'equinox', 'equipment', 'equipoise', 'equitable', 'equivalent', 'equivocal', 'equivocate', 'eradicate',
+      'erasure', 'erode', 'erosion', 'erotic', 'errant', 'erratic', 'erroneous', 'error', 'erudite', 'escalate',
+      'eschew', 'eskimo', 'esophagus', 'esoteric', 'espionage', 'espouse', 'espy', 'essence', 'estancia', 'esteem',
+      'estimable', 'estrange', 'etceteras', 'etch', 'eternal', 'ether', 'ethereal', 'ethic', 'ethical', 'ethics',
+      'ethnic', 'ethos', 'etiquette', 'eulogize', 'eulogy', 'euphemism', 'euphemistic', 'euphonious', 'euphoria', 'euthanasia',
+      'evacuate', 'evade', 'evanescent', 'evangelical', 'evangelist', 'evaporate', 'evaporation', 'evasive', 'everlasting', 'evermore',
+      'evict', 'eviction', 'evidence', 'evince', 'evocative', 'evoke', 'evolution', 'evolutionary', 'evolve', 'exacerbate',
+      'exact', 'exacting', 'exaggerate', 'exalt', 'exaltation', 'exalted', 'exasperate', 'excavate', 'exceed', 'excellency',
+      'excellent', 'exceptional', 'excerpt', 'excess', 'excise', 'excise', 'exclude', 'exclusive', 'excoriate', 'excrement',
+      'exculpate', 'excursion', 'excusable', 'execrable', 'execute', 'exemplary', 'exemplify', 'exempt', 'exert', 'exhale',
+      'exhaust', 'exhausted', 'exhaustive', 'exhilarate', 'exhilarating', 'exhort', 'exhume', 'exigent', 'existential', 'existentialist',
+      'exodus', 'exonerate', 'exorbitant', 'exoskeleton', 'exotic', 'expand', 'expanse', 'expansive', 'expatriate', 'expect',
+      'expectancy', 'expectant', 'expedient', 'expedite', 'expend', 'experiment', 'expiate', 'expiry', 'explicable', 'explicate',
+      'explicit', 'explode', 'exploit', 'explosion', 'exponent', 'exposure', 'expound', 'expression', 'expropriate', 'expulsion',
+      'expunge', 'expurgate', 'extant', 'extemporaneous', 'extensive', 'extenuate', 'exterior', 'exterminate', 'external', 'extinct',
+      'extinction', 'extinguish', 'extol', 'extort', 'extortion', 'extortionate', 'extract', 'extraction', 'extractor', 'extradite',
+      'extraneous', 'extraordinary', 'extrapolate', 'extraterrestrial', 'extravagance', 'extremism', 'extremities', 'extremity', 'extricate', 'extrovert',
+      'extrude', 'exuberant', 'exude', 'exult', 'exultant', 'eyepiece', 'eyewash', 'fable', 'fabricate', 'fabulous',
+      'facade', 'face', 'facet', 'facetious', 'facile', 'facilitate', 'facility', 'facing', 'facsimile', 'faction',
+      'factious', 'factitious', 'factor', 'factorable', 'factual', 'failing', 'fainthearted', 'fairground', 'fairway', 'fake',
+      'falcon', 'fallacious', 'fallacy', 'fallible', 'fallow', 'fallow', 'falsetto', 'falsify', 'falsity', 'familial',
+      'familiarity', 'fanatic', 'fanciful', 'fanfare', 'faraway', 'farce', 'farcical', 'farsighted', 'fascinate', 'fastidious',
+      'fatalism', 'fatality', 'fated', 'fateful', 'fatuous', 'faucet', 'fauna', 'fawn', 'fawn', 'faze',
+      'feasible', 'feast', 'feat', 'featherbrained', 'feckless', 'fecund', 'federalism', 'federalist', 'federate', 'feebleminded',
+      'feign', 'feint', 'felicitous', 'felicity', 'felonious', 'felony', 'felt', 'femininity', 'fence', 'fend',
+      'fender', 'feral', 'fermentation', 'fern', 'ferocious', 'ferocity', 'ferret', 'fertile', 'fertilization', 'fervent',
+      'fervid', 'fervor', 'fester', 'festive', 'festivity', 'festoon', 'fetching', 'fete', 'fetid', 'fetish',
+      'fetter', 'fetus', 'feud', 'feudal', 'feverish', 'fiasco', 'fibreglass', 'fickle', 'fictitious', 'fiddling',
+      'fiddly', 'fidelity', 'fidget', 'field', 'fieldwork', 'fiend', 'fiendish', 'figment', 'figurative', 'figurehead',
+      'figurine', 'filch', 'filial', 'fillet', 'filter', 'finale', 'finch', 'finely', 'finery', 'finesse',
+      'fingertip', 'finicky', 'finite', 'firebrand', 'firebrick', 'firedamp', 'firepower', 'fiscal', 'fishery', 'fishmonger',
+      'fission', 'fissure', 'fitful', 'fitting', 'fixer', 'fixture', 'fizz', 'flabby', 'flaccid', 'flag',
+      'flagella', 'flagpole', 'flagrant', 'flail', 'flair', 'flak', 'flamboyant', 'flame', 'flammable', 'flank',
+      'flare', 'flashback', 'flask', 'flaunt', 'flawless', 'flax', 'flaxen', 'fleck', 'fledgling', 'fleeting',
+      'flex', 'flexible', 'flexitime', 'flicker', 'flier', 'flighty', 'flimsy', 'flinch', 'flip', 'flippant',
+      'flirt', 'flit', 'flog', 'floodgate', 'floodlight', 'flop', 'floppy', 'floral', 'florid', 'florist',
+      'flounder', 'flout', 'fluctuate', 'fluctuation', 'fluent', 'fluid', 'fluidity', 'fluke', 'flunk', 'flurry',
+      'flux', 'flyer', 'flyleaf', 'flywheel', 'focus', 'foggy', 'fogy', 'foible', 'foil', 'foil',
+      'foist', 'fold', 'folder', 'foliate', 'folivore', 'folklore', 'foment', 'fondle', 'font', 'foolhardy',
+      'foolproof', 'foothill', 'foothold', 'footloose', 'footman', 'footwork', 'forage', 'foray', 'forbear', 'forbear',
+      'forbearance', 'forbidding', 'force', 'forceps', 'forcible', 'forebode', 'foreboding', 'forecast', 'forecourt', 'forefront',
+      'forego', 'foreground', 'foreknowledge', 'foreland', 'forensic', 'foreordain', 'forerun', 'forerunner', 'foreshadow', 'foreshore',
+      'foresight', 'forestall', 'forester', 'foretaste', 'foretell', 'forethought', 'forewarn', 'forfeit', 'forge', 'forgery',
+      'forgo', 'forlorn', 'formative', 'formidable', 'formula', 'formulate', 'formulation', 'fornicate', 'forsake', 'forte',
+      'forthright', 'forthwith', 'fortify', 'fortitude', 'fortuitous', 'fortunate', 'fossil', 'foster', 'foul', 'foul',
+      'fount', 'fraction', 'fractious', 'fracture', 'fragile', 'franchise', 'frank', 'frantic', 'fraternal', 'fraudulent',
+      'fraught', 'fray', 'fray', 'freak', 'freckle', 'freehand', 'freelance', 'freewheel', 'freighter', 'frenetic',
+      'frenzied', 'frenzy', 'frequency', 'frequent', 'fresco', 'fret', 'fretful', 'frightful', 'frigid', 'frill',
+      'frisk', 'fritter', 'frivolity', 'frivolous', 'frizzle', 'frizzy', 'frock', 'frogman', 'frolic', 'frolicsome',
+      'frontage', 'frontal', 'frontbench', 'frostbite', 'froth', 'frowzy', 'frugal', 'fruiterer', 'fruition', 'frustrate',
+      'fuddle', 'fudge', 'fudge', 'fugacious', 'fugitive', 'fugue', 'fulminate', 'fulsome', 'fumble', 'fumigate',
+      'fundamental', 'fungi', 'fungible', 'funicular', 'funk', 'funky', 'funnel', 'furbish', 'furl', 'furlough',
+      'furnishings', 'furrier', 'furrow', 'furtive', 'fuse', 'fusion', 'futile', 'futility', 'futuristic', 'fuzz',
+      'fuzzy', 'gabble', 'gable', 'gaiety', 'gainsay', 'gala', 'gall', 'gallant', 'gallop', 'galore',
+      'galvanize', 'gambit', 'gamble', 'gambol', 'gape', 'garble', 'gargantuan', 'garland', 'garner', 'garnish',
+      'garrulous', 'gasoline', 'gastric', 'gastritis', 'gastronomy', 'gaucherie', 'gauge', 'gaunt', 'gazette', 'gearbox',
+      'gene', 'generalize', 'generate', 'generation', 'generative', 'generator', 'generic', 'generosity', 'genesis', 'genetic',
+      'genial', 'genome', 'genotype', 'genre', 'genteel', 'gentility', 'geology', 'geometric', 'geometry', 'germane',
+      'germinate', 'germination', 'gestate', 'gesticulate', 'gesticulation', 'gesture', 'ghastly', 'gibber', 'gibberish', 'gibbon',
+      'gibe', 'giddy', 'gigantic', 'gill', 'gimmick', 'giraffe', 'girder', 'girdle', 'glacial', 'glacier',
+      'gladiator', 'glamorize', 'glamorous', 'glance', 'gland', 'glaze', 'glean', 'glee', 'glimmer', 'glimpse',
+      'gloaming', 'gloat', 'global', 'gloomy', 'glorious', 'gloss', 'glossary', 'glucose', 'glum', 'glutinous',
+      'glutton', 'gluttonous', 'glycerol', 'glycogen', 'gnarled', 'gnash', 'gobble', 'goggle', 'goody', 'gorge',
+      'gospel', 'gossamer', 'gossip', 'gourmet', 'gradual', 'graduate', 'graffiti', 'graft', 'graft', 'grandeur',
+      'grandiloquent', 'grandiose', 'granular', 'granule', 'graph', 'graphic', 'grapple', 'grasshopper', 'grate', 'gratify',
+      'gratuitous', 'gratuity', 'gravel', 'gravitate', 'gravitation', 'gravity', 'greedy', 'gregarious', 'grid', 'grief',
+      'grievance', 'grievous', 'grimace', 'grimy', 'grip', 'gripe', 'grisly', 'gross', 'grotesque', 'grounding',
+      'grove', 'grovel', 'gruesome', 'gruff', 'grumpy', 'guarantee', 'guile', 'guileless', 'guilty', 'guise',
+      'gullible', 'gurgle', 'guru', 'gush', 'gusto', 'guttural', 'guzzle', 'gypsum', 'gypsy', 'gyrate',
+      'habitable', 'habitual', 'habituate', 'habitude', 'habitue', 'hack', 'hack', 'hacked', 'hackle', 'hackney',
+      'hackneyed', 'hacksaw', 'hadron', 'haggard', 'haggle', 'hail', 'hairdo', 'hairpiece', 'halcyon', 'hale',
+      'hallmark', 'hallowed', 'hallucinate', 'hallucination', 'halo', 'halter', 'halve', 'hamlet', 'hammock', 'hamper',
+      'hamstring', 'handbrake', 'handily', 'handiness', 'handiwork', 'handlebar', 'handpicked', 'handsomely', 'handstand', 'handyman',
+      'hangar', 'hanger', 'hangings', 'hangman', 'hangnail', 'hangover', 'hanker', 'haphazard', 'hapless', 'harangue',
+      'harass', 'harbinger', 'hardball', 'hardbitten', 'hardboard', 'hardcore', 'hardheaded', 'hardihood', 'hardtop', 'hardwood',
+      'harebrained', 'harelip', 'harmonica', 'harmonious', 'harmonium', 'harness', 'harp', 'harp', 'harpoon', 'harrow',
+      'harrowing', 'hash', 'hassle', 'haste', 'hatchback', 'hatchery', 'hatchet', 'haughty', 'haulage', 'haunch',
+      'haven', 'haversack', 'havoc', 'haystack', 'haywire', 'hazard', 'hazardous', 'haze', 'hazel', 'headdress',
+      'headgear', 'headhunter', 'headland', 'headrest', 'headship', 'headstone', 'headstrong', 'headway', 'heady', 'hearsay',
+      'hearse', 'hearten', 'hearth', 'heartland', 'heartrending', 'heartstring', 'heartwarming', 'heat', 'heathen', 'heatstroke',
+      'heck', 'heckle', 'hectic', 'hector', 'hedonism', 'hedonist', 'heed', 'heedful', 'heedless', 'hefty',
+      'hegemony', 'heifer', 'height', 'heinous', 'heirloom', 'helium', 'helix', 'helm', 'hemline', 'hemlock',
+      'hemoglobin', 'hemolysis', 'hemophilia', 'hemorrhage', 'hemorrhoid', 'hemp', 'henceforth', 'henchman', 'henpecked', 'hepatitis',
+      'herald', 'herbaceous', 'herbivore', 'herbivorous', 'hereafter', 'hereby', 'hereditary', 'heredity', 'herein', 'hereof',
+      'heresy', 'heretic', 'heretical', 'hereto', 'heretofore', 'herewith', 'hermetic', 'hermit', 'hermitage', 'hesitant',
+      'hesitation', 'heterodox', 'heterogeneity', 'heterogeneous', 'heteromorphic', 'hexagon', 'heyday', 'hiatus', 'hibernate', 'hideaway',
+      'hidebound', 'hideous', 'hierarchical', 'hierarchy', 'hieroglyphics', 'highbrow', 'highchair', 'highhanded', 'highlight', 'highness',
+      'hilarious', 'hillock', 'hilt', 'hinder', 'hindi', 'hindmost', 'hindquarters', 'hindrance', 'hindsight', 'hinduism',
+      'hirsute', 'hispanic', 'hiss', 'historical', 'histrionic', 'hither', 'hive', 'hoard', 'hoarding', 'hoarse',
+      'hoary', 'hoax', 'hobble', 'hobbyhorse', 'hobgoblin', 'hobnail', 'hobnob', 'hodgepodge', 'hoggish', 'hogshead',
+      'holdall', 'holding', 'holiness', 'holly', 'holocaust', 'hologram', 'holster', 'homage', 'homeostasis', 'homestead',
+      'homicide', 'homily', 'homing', 'homogeneity', 'homogeneous', 'homologous', 'homonym', 'homosexual', 'hone', 'honeycomb',
+      'honk', 'hoodwink', 'hooligan', 'hooray', 'hoot', 'hoover', 'hopper', 'horde', 'hormone', 'hornet',
+      'horoscope', 'horrendous', 'horrid', 'horrific', 'horseplay', 'horseshoe', 'horticulture', 'hosiery', 'hospice', 'hospitable',
+      'hostility', 'hotbed', 'hotchpotch', 'hotelier', 'hotfoot', 'hothead', 'hothouse', 'hotly', 'hotplate', 'hotpot',
+      'housebound', 'housecoat', 'housecraft', 'housemaster', 'housewifery', 'hovel', 'howler', 'hubbub', 'huckster', 'huddle',
+      'huff', 'hulk', 'hulking', 'hull', 'humane', 'humanity', 'humble', 'humbug', 'humdrum', 'humid',
+      'humiliate', 'humility', 'humorous', 'hump', 'humpback', 'humus', 'hunch', 'hunchback', 'hundredth', 'hundredweight',
+      'hunk', 'hurdle', 'hurricane', 'hurtle', 'husbandry', 'husk', 'husky', 'hustle', 'hutch', 'hybrid',
+      'hydrant', 'hydrate', 'hydraulic', 'hydrocarbon', 'hydrochloric', 'hydroelectricity', 'hydrogen', 'hydrolysis', 'hydroxide', 'hype',
+      'hyperactive', 'hypercritical', 'hypermarket', 'hypertension', 'hyphenate', 'hypnosis', 'hypnotic', 'hypnotism', 'hypocrisy', 'hypocrite',
+      'hypocritical', 'hypodermic', 'hypotenuse', 'hypothesis', 'hysterical', 'icebreaker', 'icicle', 'icing', 'icon', 'iconoclast',
+      'idealist', 'idealize', 'identical', 'idiosyncrasy', 'idle', 'idolatry', 'idyllic', 'ignite', 'ignition', 'ignoble',
+      'ignominious', 'ignominy', 'illegal', 'illegible', 'illicit', 'illiterate', 'illuminate', 'illusion', 'illustrator', 'illustrious',
+      'image', 'imagery', 'imaginary', 'imaginative', 'imbecile', 'imbecility', 'imbibe', 'imbue', 'imitate', 'immaculate',
+      'immaterial', 'immediate', 'immense', 'immerse', 'immigrate', 'imminent', 'immobile', 'immoderate', 'immoral', 'immortal',
+      'immune', 'immunize', 'immutable', 'impact', 'impair', 'impale', 'impalpable', 'impart', 'impartial', 'impasse',
+      'impassioned', 'impassive', 'impeccable', 'impede', 'impediment', 'impel', 'impend', 'impending', 'impenetrable', 'impenitent',
+      'imperative', 'imperceptible', 'imperceptive', 'imperil', 'imperious', 'impersonate', 'impertinent', 'impervious', 'impetuous', 'impetus',
+      'impinge', 'impious', 'implacable', 'implant', 'implausible', 'implement', 'implicate', 'implication', 'implicit', 'implore',
+      'importunate', 'impostor', 'impotence', 'impotent', 'impound', 'impoverish', 'impregnable', 'impregnate', 'impression', 'impressionable',
+      'imprint', 'impromptu', 'impropriety', 'improvise', 'imprudent', 'impugn', 'impulse', 'impulsive', 'impunity', 'impurity',
+      'impute', 'inaccessible', 'inadvertent', 'inalienable', 'inalterable', 'inanimate', 'inarticulate', 'inborn', 'inbuilt', 'incandescent',
+      'incantation', 'incapacitate', 'incarnate', 'incarnation', 'incendiary', 'incense', 'incense', 'incensed', 'incentive', 'inception',
+      'incessant', 'incest', 'inchoate', 'incident', 'incinerate', 'incipient', 'incise', 'incisive', 'incite', 'inclement',
+      'inclination', 'inclusive', 'incognito', 'incoherent', 'incoming', 'incommodious', 'incompatible', 'incomprehensible', 'inconceivable', 'incongruous',
+      'inconsequential', 'inconsistent', 'incontrovertible', 'inconvenient', 'incorporate', 'incorrigible', 'incredulous', 'incriminate', 'incubate', 'incubation',
+      'incubator', 'incubus', 'inculcate', 'inculpable', 'incumbent', 'incur', 'incursion', 'indebted', 'indecipherable', 'indecision',
+      'indefinitely', 'indelible', 'indemnify', 'indemnity', 'indent', 'independent', 'indeterminate', 'indicant', 'indicator', 'indict',
+      'indifferent', 'indigence', 'indigenous', 'indigestion', 'indignant', 'indigo', 'indiscernible', 'indiscreet', 'indiscriminate', 'indisposed',
+      'indisputable', 'indistinct', 'indistinguishable', 'indoctrinate', 'indolence', 'indolent', 'indomitable', 'indubitable', 'induce', 'induct',
+      'induction', 'indulgent', 'inebriate', 'ineffectual', 'inefficacious', 'ineluctable', 'inept', 'inequality', 'inequity', 'inert',
+      'inertia', 'inescapable', 'inestimable', 'inevitable', 'inexcusable', 'inexhaustible', 'inexorable', 'inexplicable', 'infallible', 'infamous',
+      'infantile', 'infantry', 'infatuated', 'infatuation', 'infection', 'infernal', 'infest', 'infidelity', 'infighting', 'infiltrate',
+      'infinitesimal', 'infirm', 'infirmary', 'infirmity', 'inflame', 'inflamed', 'inflammable', 'inflammation', 'inflammatory', 'inflection',
+      'inflexible', 'inflict', 'inflow', 'influential', 'influx', 'informal', 'infrared', 'infrastructure', 'infringe', 'infuriate',
+      'infuse', 'ingenious', 'ingenuous', 'inglorious', 'ingrained', 'ingrate', 'ingratiate', 'ingratiating', 'ingredient', 'inherent',
+      'inheritance', 'inhibit', 'inhospitable', 'inhuman', 'inhume', 'inimical', 'initiate', 'inject', 'injunction', 'injurious',
+      'inkling', 'inlaid', 'inmate', 'inmost', 'innate', 'innocuous', 'innovate', 'innovative', 'innumerable', 'inoculate',
+      'inoffensive', 'inordinate', 'input', 'inquisition', 'inquisitive', 'insanity', 'insatiable', 'inscrutable', 'insensate', 'insensible',
+      'inset', 'insidious', 'insight', 'insightful', 'insignificant', 'insinuate', 'insipid', 'insofar', 'insolent', 'insoluble',
+      'insomnia', 'insomniac', 'insomuch', 'insouciance', 'inspection', 'inspiration', 'inspire', 'inspiring', 'instance', 'instant',
+      'instantaneous', 'instep', 'instigate', 'instill', 'instinct', 'instruct', 'instrument', 'insular', 'insulate', 'insulator',
+      'insulin', 'insuperable', 'insure', 'insurgent', 'insurrection', 'intake', 'intangible', 'integer', 'integrate', 'integrity',
+      'intellect', 'intellectual', 'intelligence', 'intelligible', 'intensive', 'intentional', 'interact', 'intercede', 'intercept', 'intercession',
+      'interchangeable', 'interface', 'interference', 'interim', 'interject', 'interjection', 'interlock', 'interlocutor', 'interloper', 'interlude',
+      'intermediary', 'intermediate', 'interment', 'interminable', 'intermingle', 'intermit', 'intermittent', 'intern', 'intern', 'interplay',
+      'interpolate', 'interpose', 'interposition', 'interpreter', 'interrogate', 'interrupt', 'intersect', 'intersperse', 'interval', 'intervene',
+      'intestinal', 'intimacy', 'intimidate', 'intolerable', 'intonation', 'intoxicant', 'intoxicate', 'intractable', 'intransigent', 'intransitive',
+      'intrepid', 'intricacy', 'intricate', 'intrigue', 'intriguing', 'intrinsic', 'introductory', 'introspect', 'introvert', 'intruder',
+      'intrusive', 'intuition', 'intuitive', 'inundate', 'inure', 'invalid', 'invalidate', 'invaluable', 'invasion', 'invective',
+      'inveigh', 'inventive', 'inveterate', 'invidious', 'invigilate', 'invigilator', 'invigorate', 'invincible', 'inviolable', 'invocation',
+      'invoice', 'invoke', 'involuntary', 'involve', 'invulnerable', 'iodide', 'iodine', 'irascible', 'irate', 'iridescent',
+      'iris', 'irksome', 'iron', 'ironic', 'irony', 'irradiate', 'irrational', 'irreconcilable', 'irreducible', 'irrelevant',
+      'irreparable', 'irrepressible', 'irresolute', 'irrespective', 'irretrievable', 'irreverent', 'irreversible', 'irrevocable', 'irritable', 'irritant',
+      'irritate', 'irruption', 'isochronous', 'isolate', 'isotherm', 'isothermal', 'isotope', 'issuance', 'issue', 'itch',
+      'itinerant', 'itinerary', 'itinerate', 'jade', 'jaded', 'jagged', 'jargon', 'javelin', 'jaywalk', 'jeer',
+      'jellyfish', 'jeopardize', 'jerky', 'jest', 'jetty', 'jigsaw', 'jingle', 'jingoism', 'jocose', 'jocular',
+      'jocund', 'joggle', 'joint', 'jolt', 'jostle', 'jovial', 'joystick', 'jubilant', 'jubilation', 'judicature',
+      'judicious', 'juggle', 'jumble', 'jumbo', 'junction', 'juncture', 'jungle', 'juridical', 'jurisdiction', 'jurisprudence',
+      'juror', 'justifiable', 'justification', 'justify', 'juvenile', 'juxtapose', 'juxtaposition', 'keel', 'keepsake', 'kennel',
+      'kernel', 'kickoff', 'kidney', 'kiln', 'kindred', 'kinetic', 'kinsfolk', 'kinship', 'kiosk', 'kismet',
+      'kiwi', 'kleptomaniac', 'knack', 'knave', 'knavery', 'knead', 'knighthood', 'knowhow', 'kudos', 'laborious',
+      'labyrinth', 'lacerate', 'lackadaisical', 'laconic', 'lacquer', 'lactose', 'ladle', 'lager', 'laggard', 'lagoon',
+      'lambaste', 'lament', 'lance', 'landlord', 'landmark', 'landscape', 'languid', 'languish', 'languor', 'lapse',
+      'larceny', 'larvae', 'laryngitis', 'larynx', 'lascivious', 'laser', 'lassitude', 'lasting', 'latch', 'latency',
+      'latent', 'lateral', 'latest', 'lathe', 'laud', 'laudable', 'laudation', 'laudatory', 'launderette', 'laurel',
+      'lave', 'lavish', 'lawsuit', 'laxative', 'layoff', 'lead', 'leaflet', 'leaven', 'lecherous', 'ledge',
+      'ledger', 'leek', 'leeway', 'legacy', 'legendary', 'legible', 'legislate', 'legislative', 'legislator', 'legitimate',
+      'legitimize', 'leisure', 'length', 'lengthy', 'leniency', 'lenient', 'lens', 'lentil', 'leprosy', 'lesbian',
+      'lethal', 'lethargy', 'levee', 'levee', 'leverage', 'levity', 'levy', 'lewd', 'lexical', 'lexicographer',
+      'lexicography', 'lexicon', 'lexis', 'liable', 'libel', 'liberal', 'liberate', 'liberty', 'license', 'licentious',
+      'licit', 'lieu', 'lifelong', 'lifetime', 'ligament', 'light', 'lighten', 'likelihood', 'liken', 'likeness',
+      'lilac', 'limelight', 'limitation', 'linchpin', 'line', 'lineage', 'linear', 'linesman', 'lingual', 'linguist',
+      'linguistics', 'liquefy', 'liquid', 'liquidate', 'liquor', 'listless', 'literacy', 'literal', 'literally', 'literary',
+      'literate', 'literature', 'lithe', 'litigant', 'litigation', 'litigious', 'litmus', 'littoral', 'lively', 'liven',
+      'livid', 'loathe', 'lobby', 'lobe', 'lobster', 'locus', 'lodge', 'loft', 'logical', 'logistics',
+      'logo', 'loin', 'loiter', 'loll', 'longevity', 'lookout', 'loop', 'loophole', 'loot', 'lopsided',
+      'loquacious', 'lotion', 'lotus', 'louse', 'lousy', 'lowbrow', 'lubricant', 'lucid', 'lucrative', 'lucubration',
+      'ludicrous', 'lugubrious', 'lukewarm', 'lull', 'lullaby', 'luminary', 'luminescent', 'luminous', 'lunacy', 'lunatic',
+      'lung', 'lunge', 'lurch', 'lure', 'lurid', 'lurk', 'luscious', 'lush', 'lust', 'luxuriant',
+      'lychee', 'lynch', 'lyric', 'lyrical', 'macabre', 'macaroni', 'machination', 'macho', 'mackerel', 'macroeconomic',
+      'macrophage', 'madden', 'mafia', 'maggot', 'magnanimous', 'magnate', 'magnet', 'magnetism', 'magnification', 'magnitude',
+      'magnolia', 'magpie', 'maim', 'mainspring', 'mainstay', 'mainstream', 'maintain', 'maintenance', 'majestic', 'makeshift',
+      'maladjusted', 'maladministration', 'malaise', 'malediction', 'malevolent', 'malfeasance', 'malformed', 'malfunction', 'malice', 'malicious',
+      'malign', 'malignancy', 'malignant', 'malinger', 'malleable', 'malodorous', 'malpractice', 'malt', 'mammoth', 'manacle',
+      'manageable', 'managerial', 'mandarin', 'mandate', 'mandatory', 'mane', 'maneuver', 'manful', 'manger', 'mania',
+      'maniac', 'manic', 'manicure', 'manifest', 'manifestation', 'manifesto', 'manometer', 'mansion', 'manslaughter', 'mantelpiece',
+      'mantle', 'manure', 'maori', 'maple', 'mare', 'marginal', 'marijuana', 'mariner', 'marital', 'maritime',
+      'marking', 'marksman', 'marquee', 'marsh', 'mart', 'martial', 'mascot', 'mash', 'mask', 'masked',
+      'masquerade', 'mass', 'mastermind', 'mate', 'materialist', 'matinee', 'mating', 'matriarchy', 'matriculate', 'matrix',
+      'matron', 'matter', 'maudlin', 'maul', 'mauve', 'maverick', 'mawkish', 'maxim', 'mayhem', 'maze',
+      'meager', 'mean', 'meander', 'measles', 'measurable', 'measurement', 'mecca', 'mechanical', 'mechanics', 'meddle',
+      'meddler', 'median', 'mediate', 'mediator', 'medicaid', 'medication', 'medieval', 'mediocre', 'mediocrity', 'meditate',
+      'medium', 'medley', 'meek', 'megaphone', 'melancholy', 'melee', 'mellifluous', 'mellow', 'melodious', 'melodrama',
+      'membrane', 'memento', 'memorandum', 'memorize', 'menace', 'menacing', 'mendacious', 'mendicant', 'menial', 'meningitis',
+      'menopause', 'menstrual', 'mercantile', 'mercenary', 'mercurial', 'meritorious', 'mermaid', 'merriment', 'mesh', 'messiah',
+      'metabolic', 'metabolism', 'metal', 'metallurgy', 'metaphysical', 'meteor', 'meteorological', 'meteorology', 'methane', 'methodical',
+      'methodology', 'meticulous', 'miasma', 'microbiology', 'microorganism', 'microphone', 'microscope', 'midget', 'midpoint', 'midway',
+      'miff', 'migraine', 'migrant', 'milestone', 'militant', 'militarism', 'militiaman', 'millet', 'millipede', 'mime',
+      'mimic', 'mince', 'mingle', 'mink', 'minnow', 'minority', 'minus', 'minuscule', 'minute', 'mirage',
+      'mire', 'mirror', 'mirth', 'misadventure', 'misanthropy', 'misapprehend', 'misappropriate', 'misbehave', 'misbehavior', 'miscarriage',
+      'miscellaneous', 'mischievous', 'misconduct', 'miscount', 'miscreant', 'misdeed', 'miser', 'miserly', 'misfit', 'misfortune',
+      'misgiving', 'mishap', 'misinterpret', 'misnomer', 'misplace', 'misrepresent', 'missile', 'misstate', 'misstep', 'mistrust',
+      'misunderstand', 'mite', 'mitigate', 'mitten', 'mixture', 'moat', 'mock', 'mockery', 'mode', 'moderate',
+      'modest', 'modicum', 'modify', 'modular', 'modulate', 'module', 'molecule', 'molest', 'mollify', 'molt',
+      'moment', 'momentary', 'momentous', 'momentum', 'monarchy', 'monetary', 'mongrel', 'monition', 'monk', 'monochrome',
+      'monocracy', 'monogamy', 'monolingual', 'monolith', 'monologue', 'monopoly', 'monotone', 'monotonous', 'monotony', 'monsoon',
+      'montage', 'monumental', 'mope', 'morale', 'morality', 'morass', 'moratorium', 'morbid', 'mordacious', 'mordent',
+      'mores', 'moribund', 'morose', 'morphine', 'mortality', 'mortar', 'mortgage', 'mortuary', 'mosaic', 'motif',
+      'motionless', 'motley', 'motor', 'motto', 'mound', 'mount', 'mousse', 'movable', 'muck', 'muddle',
+      'muffin', 'muffle', 'multiform', 'multilateral', 'multiple', 'multiplication', 'multiplicity', 'multiply', 'multitude', 'mumble',
+      'mummy', 'mumps', 'mundane', 'municipality', 'munificence', 'munificent', 'munitions', 'mural', 'murderous', 'muse',
+      'musk', 'mussel', 'muster', 'mutant', 'mutation', 'mutilate', 'muzzle', 'myopia', 'myriad', 'mystic',
+      'mystify', 'myth', 'mythology', 'nadir', 'naive', 'namesake', 'nape', 'narcissism', 'narcissistic', 'narcissus',
+      'narrate', 'narrative', 'nasal', 'nascent', 'natal', 'nationality', 'native', 'naturalistic', 'nausea', 'nauseate',
+      'nauseous', 'nautical', 'naval', 'navel', 'navigate', 'nazism', 'nebula', 'nebulous', 'necessitate', 'necessity',
+      'nectar', 'needlework', 'needy', 'nefarious', 'negate', 'negligence', 'negligent', 'negligible', 'negotiable', 'negotiate',
+      'nemesis', 'neoclassical', 'neologism', 'neology', 'neon', 'neophyte', 'nestle', 'nettle', 'network', 'neural',
+      'neurological', 'neuron', 'neurosis', 'neurotic', 'neutral', 'neutrality', 'neutralization', 'neutralize', 'neutron', 'newsreel',
+      'nexus', 'nibble', 'nicely', 'niche', 'nickel', 'nickname', 'nicotine', 'niggardly', 'nigger', 'nigh',
+      'nihilism', 'nimble', 'nipple', 'nirvana', 'nitrate', 'nitrogen', 'nocturnal', 'node', 'noisome', 'nomad',
+      'nomadic', 'nominal', 'nominate', 'nominee', 'nonchalant', 'nondescript', 'nonetheless', 'nonplus', 'nonstop', 'nordic',
+      'norm', 'nostalgia', 'nostalgic', 'notable', 'notary', 'notation', 'noticeable', 'notification', 'notoriety', 'notorious',
+      'notwithstanding', 'nought', 'novel', 'novelty', 'novice', 'noxious', 'nuance', 'nuclei', 'nucleon', 'nucleus',
+      'nude', 'nudge', 'nudity', 'nugatory', 'nuisance', 'nullify', 'numb', 'numeration', 'numerator', 'numerical',
+      'numerous', 'nurture', 'nutrient', 'nutriment', 'nutrition', 'nuzzle', 'nymph', 'oasis', 'obdurate', 'obese',
+      'obesity', 'obfuscate', 'obituary', 'object', 'objective', 'obligate', 'obligatory', 'oblique', 'obliterate', 'oblivion',
+      'oblivious', 'obnoxious', 'oboe', 'obscene', 'obscenity', 'obscure', 'obscurity', 'obsequies', 'obsequious', 'observance',
+      'observant', 'observation', 'obsess', 'obsessive', 'obsolescent', 'obsolete', 'obstinate', 'obstreperous', 'obstruct', 'obtrude',
+      'obtrusive', 'obtuse', 'obviate', 'occasion', 'occidental', 'occlude', 'occult', 'occupancy', 'occupant', 'occurrence',
+      'oceanography', 'octagon', 'octopus', 'ocular', 'odds', 'odious', 'odoriferous', 'odorous', 'offensive', 'offhand',
+      'offshoot', 'ogle', 'ointment', 'olfactory', 'omega', 'omen', 'ominous', 'omission', 'omnipotent', 'omnipresent',
+      'omniscient', 'omnivore', 'omnivorous', 'oncoming', 'onerous', 'ongoing', 'onomatopoeia', 'onrush', 'onset', 'onslaught',
+      'onus', 'ooze', 'opal', 'opaque', 'operation', 'operational', 'operative', 'opponent', 'opportune', 'oppressive',
+      'opprobrium', 'optic', 'optics', 'optimal', 'optimism', 'optimum', 'option', 'opulent', 'opus', 'oracle',
+      'oration', 'orator', 'oratory', 'orbit', 'orbital', 'orchestra', 'orchestrate', 'orchid', 'ordain', 'order',
+      'ordinal', 'ordinance', 'ordinate', 'organelle', 'organic', 'orgasm', 'orgy', 'orientation', 'orifice', 'origin',
+      'original', 'ornamental', 'ornate', 'orthodox', 'orthodoxy', 'oscillate', 'oscillation', 'osmosis', 'ossify', 'ostensible',
+      'ostensibly', 'ostentatious', 'ostracize', 'oust', 'outbreak', 'outburst', 'outcast', 'outcome', 'outcry', 'outdo',
+      'outfit', 'outgoing', 'outgrow', 'outlandish', 'outlast', 'outlaw', 'outlay', 'outlive', 'outnumber', 'outpost',
+      'output', 'outrage', 'outrageous', 'outreach', 'outright', 'outspoken', 'outstretch', 'outstrip', 'outweigh', 'ovation',
+      'overboard', 'overcome', 'overdose', 'overflow', 'overlap', 'overleap', 'overlook', 'overlord', 'overly', 'overpass',
+      'overpower', 'override', 'overrun', 'oversee', 'overshadow', 'oversight', 'overstate', 'overstride', 'overt', 'overthrow',
+      'overture', 'overview', 'overweight', 'overwhelming', 'overwork', 'ovum', 'ownership', 'oxide', 'oxidize', 'oxidizer',
+      'oxygen', 'ozone', 'pacify', 'paddy', 'padlock', 'pagan', 'pageant', 'painstaking', 'palatable', 'palatal',
+      'palate', 'palatial', 'palette', 'palliate', 'pallid', 'palpable', 'pamper', 'pamphlet', 'panacea', 'pancake',
+      'pancreas', 'pandemic', 'panegyric', 'pang', 'panic', 'panorama', 'panoramic', 'pant', 'panther', 'pantomime',
+      'parable', 'paradigm', 'paradox', 'paradoxical', 'paraffin', 'paragon', 'parallel', 'parallelogram', 'paralysis', 'paralytic',
+      'paralyze', 'parameter', 'paramilitary', 'paramount', 'paranoia', 'paranoid', 'paraphrase', 'parasite', 'parch', 'pare',
+      'parentage', 'parenthetical', 'parochial', 'parody', 'parole', 'paroxysm', 'parry', 'parse', 'parsimonious', 'parsley',
+      'parson', 'partake', 'partiality', 'participate', 'particle', 'partisan', 'partition', 'passive', 'pasta', 'pastel',
+      'pastoral', 'patchy', 'path', 'pathogen', 'pathologic', 'pathology', 'pathos', 'patio', 'patriarch', 'patriarchal',
+      'patriotism', 'patronage', 'patter', 'pauper', 'pawn', 'pawn', 'payout', 'payroll', 'peak', 'peat',
+      'peccadillo', 'peccant', 'pecuniary', 'pedagogic', 'pedagogue', 'pedagogy', 'pedal', 'pedant', 'pedantic', 'peddle',
+      'pedestal', 'pedestrian', 'pediatrics', 'pedigree', 'peek', 'peerless', 'peevish', 'pejorative', 'pelican', 'pellucid',
+      'penalize', 'penalty', 'penchant', 'pending', 'pendulum', 'penetrate', 'peninsular', 'penis', 'penitent', 'pension',
+      'pensioner', 'pensive', 'pentagon', 'pentathlon', 'penthouse', 'penumbra', 'penurious', 'penury', 'peppermint', 'pepsin',
+      'perambulate', 'perceive', 'perceptible', 'perception', 'perceptive', 'percipient', 'percolate', 'percussion', 'peremptory', 'perennial',
+      'perfidious', 'perforate', 'perform', 'perfunctory', 'perilous', 'perimeter', 'period', 'periodic', 'periodical', 'periodicity',
+      'peripheral', 'periphery', 'periscope', 'perish', 'perjure', 'perjury', 'perk', 'permanent', 'permeable', 'permeate',
+      'permissible', 'permutation', 'pernicious', 'perpendicular', 'perpetrate', 'perpetrator', 'perpetuate', 'perplexing', 'persecution', 'persevere',
+      'persistent', 'personage', 'personality', 'personify', 'personnel', 'perspective', 'perspicacious', 'perspicacity', 'perspicuity', 'perspicuous',
+      'perspire', 'persuade', 'persuasive', 'pertain', 'pertinacious', 'pertinacity', 'pertinent', 'perturb', 'perusal', 'peruse',
+      'pervade', 'pervasive', 'perverse', 'pervert', 'pervert', 'pervious', 'pester', 'pesticide', 'pestilence', 'petrify',
+      'petulant', 'phantom', 'pharmaceutical', 'pharmacy', 'phase', 'pheasant', 'phenomenal', 'phenomenon', 'pheromone', 'philanthropic',
+      'philanthropy', 'philosophy', 'phlegmatic', 'phonic', 'phonology', 'phosphate', 'phosphorous', 'phosphorus', 'phosphorusp', 'photography',
+      'photon', 'photosynthesis', 'physics', 'physiotherapy', 'physique', 'picket', 'pickle', 'pictograph', 'pidgin', 'piecemeal',
+      'pier', 'piety', 'pigment', 'pigsty', 'pike', 'pile', 'pillage', 'pillory', 'pinch', 'pinnacle',
+      'pinpoint', 'pious', 'pipette', 'pique', 'piracy', 'piss', 'piston', 'pitch', 'pitcher', 'piteous',
+      'pitfall', 'pithy', 'pivot', 'pivotal', 'placate', 'place', 'placenta', 'placid', 'plagiarism', 'plague',
+      'plaid', 'plaintiff', 'plaintive', 'plane', 'planetary', 'plank', 'plaque', 'plasma', 'plaster', 'plastic',
+      'plasticity', 'platitude', 'platoon', 'plaudit', 'plausible', 'playful', 'playoff', 'playwright', 'plea', 'plead',
+      'pleat', 'plebeian', 'plenipotentiary', 'plenitude', 'plenteous', 'plethora', 'plight', 'plumb', 'plummet', 'plunder',
+      'plunger', 'plural', 'pluralism', 'plus', 'plush', 'plutonium', 'poach', 'pockmark', 'poignant', 'point',
+      'pointer', 'poise', 'polar', 'polarity', 'polarization', 'polarize', 'polemic', 'polemics', 'polio', 'polish',
+      'politic', 'pollen', 'pollster', 'pollute', 'polyester', 'polygamy', 'polyglot', 'polymer', 'polytechnic', 'pomp',
+      'pompous', 'ponder', 'ponderous', 'pontiff', 'poplar', 'poppy', 'populace', 'population', 'populous', 'pore',
+      'portent', 'portfolio', 'portion', 'portray', 'posit', 'positive', 'posse', 'possess', 'possessive', 'postdate',
+      'posterior', 'posthumous', 'postscript', 'postulate', 'posture', 'postwar', 'potency', 'potent', 'potentate', 'potential',
+      'potion', 'potluck', 'pouch', 'pounce', 'poverty', 'power', 'powerless', 'practicable', 'practicality', 'practitioner',
+      'pragmatic', 'prank', 'prankster', 'prate', 'prattle', 'preamble', 'precarious', 'precaution', 'precede', 'precedence',
+      'precedent', 'preceding', 'precession', 'precinct', 'precipice', 'precipitate', 'precipitation', 'precipitous', 'precise', 'precision',
+      'preclude', 'precocious', 'precursor', 'predation', 'predatory', 'predestine', 'predetermine', 'predicament', 'predict', 'predominant',
+      'predominate', 'preeminence', 'preempt', 'preemption', 'prefabricate', 'preface', 'preferable', 'preference', 'preferential', 'prehensile',
+      'prehension', 'prejudice', 'prelude', 'premature', 'premier', 'premise', 'premium', 'première', 'premonition', 'prenatal',
+      'preoccupied', 'preoccupy', 'preordain', 'preparatory', 'preponderant', 'preponderate', 'prepossess', 'prepossessing', 'preposterous', 'prerequisite',
+      'prerogative', 'presage', 'preschool', 'prescience', 'prescient', 'prescript', 'prescription', 'presentient', 'presentiment', 'preservation',
+      'presidium', 'pressing', 'pressure', 'presume', 'presumption', 'presumptuous', 'presuppose', 'pretend', 'pretension', 'pretentious',
+      'pretext', 'prevalent', 'prevaricate', 'prickle', 'priggish', 'prim', 'primer', 'primeval', 'primitive', 'primordial',
+      'primp', 'principal', 'principle', 'prism', 'pristine', 'privacy', 'privilege', 'probability', 'probate', 'probation',
+      'probe', 'probity', 'procedural', 'procedure', 'proceed', 'proclaim', 'proclamation', 'procrastinate', 'proctor', 'procure',
+      'prod', 'prodigal', 'prodigious', 'prodigy', 'producer', 'product', 'productive', 'profess', 'profession', 'proficiency',
+      'proficient', 'profile', 'profiteer', 'profligate', 'profound', 'profuse', 'progeny', 'progression', 'prohibit', 'prohibition',
+      'prohibitive', 'projectile', 'projection', 'projector', 'prokaryotic', 'proliferate', 'proliferation', 'prolific', 'prolix', 'prologue',
+      'prolong', 'prominence', 'prominent', 'promiscuous', 'promote', 'promotion', 'promulgate', 'prone', 'propaganda', 'propagate',
+      'propel', 'propellant', 'prophecy', 'prophesy', 'prophetic', 'propitious', 'proponent', 'proportion', 'proportionate', 'proposition',
+      'propriety', 'propulsion', 'prosaic', 'proscribe', 'prosecute', 'prosecutor', 'prospective', 'prosperity', 'prostate', 'prostrate',
+      'protagonist', 'protein', 'protocol', 'proton', 'prototype', 'protract', 'protracted', 'protrude', 'protuberate', 'proverb',
+      'provident', 'provincial', 'provisional', 'provocative', 'provoke', 'prowess', 'proximity', 'proxy', 'prudent', 'prudential',
+      'prudish', 'pseudo', 'pseudonym', 'psychiatrist', 'psychic', 'psycho', 'psychoanalyst', 'psychotherapist', 'psychotherapy', 'puberty',
+      'puerile', 'pugnacious', 'puissant', 'pulley', 'pullover', 'pulpit', 'pulverize', 'punctilious', 'punctual', 'punctuate',
+      'pundit', 'pungent', 'punitive', 'purely', 'purgatory', 'purge', 'purity', 'purloin', 'purport', 'purposeful',
+      'pursue', 'pusillanimous', 'putrid', 'pyre', 'pyromania', 'python', 'quadrangle', 'quadrant', 'quadratic', 'quadrilateral',
+      'quadruple', 'quagmire', 'quail', 'quail', 'quaint', 'quaker', 'qualification', 'qualifier', 'qualify', 'qualitative',
+      'qualm', 'quandary', 'quantifier', 'quantitative', 'quantity', 'quantum', 'quarantine', 'quarrelsome', 'quarterly', 'quartet',
+      'quartz', 'quash', 'quaver', 'queasy', 'quell', 'quench', 'querulous', 'query', 'questionable', 'quibble',
+      'quick', 'quicksand', 'quiescent', 'quietus', 'quintessence', 'quintet', 'quip', 'quirk', 'quitter', 'quiver',
+      'quixotic', 'quizzical', 'quorum', 'quotation', 'quotient', 'rabbi', 'rabid', 'rabies', 'racer', 'racket',
+      'racketeer', 'raconteur', 'racy', 'radar', 'radiance', 'radiant', 'radiate', 'radical', 'radioactive', 'radius',
+      'raffle', 'raft', 'raft', 'rail', 'raiser', 'rake', 'ramble', 'rambler', 'ramification', 'ramify',
+      'rampage', 'rampant', 'rampart', 'rancid', 'rancor', 'rancour', 'randomly', 'randy', 'range', 'ranger',
+      'rankle', 'rant', 'rapacious', 'rapine', 'rapist', 'rapport', 'rapprochement', 'rapt', 'rapture', 'rarity',
+      'rasp', 'rate', 'rateable', 'ratification', 'ratify', 'ratio', 'ratiocination', 'ration', 'rational', 'rationale',
+      'rationalism', 'rationality', 'rationalization', 'rationalize', 'rattle', 'raucous', 'ravage', 'ravenous', 'ravine', 'ravish',
+      'raze', 'reaction', 'reactionary', 'reactor', 'readily', 'readjust', 'reaffirm', 'reagent', 'realism', 'realm',
+      'rearguard', 'rearmament', 'rearrange', 'reasonable', 'reasoning', 'reassure', 'rebate', 'rebellious', 'rebound', 'rebuff',
+      'rebuke', 'rebut', 'recalcitrant', 'recant', 'recapitulate', 'recapture', 'recede', 'receptive', 'recessive', 'recipient',
+      'reciprocal', 'reciprocate', 'reciprocity', 'recitation', 'reck', 'reckless', 'reclaim', 'reclamation', 'recline', 'recluse',
+      'reclusive', 'recoil', 'recollect', 'recombination', 'recompense', 'reconciliation', 'recondite', 'reconnoiter', 'reconsider', 'recount',
+      'recount', 'recoup', 'recourse', 'recover', 'recreant', 'recreate', 'recriminate', 'recrudescent', 'recruit', 'rectangle',
+      'rectangular', 'rectification', 'rectify', 'rectitude', 'rector', 'recumbent', 'recuperate', 'recur', 'recurrent', 'redbrick',
+      'redeem', 'redemption', 'redemptive', 'redirect', 'redolent', 'redoubtable', 'redound', 'redraw', 'redress', 'reductio',
+      'redundancy', 'redundant', 'reedy', 'refer', 'referendum', 'reflection', 'reform', 'refract', 'refraction', 'refractory',
+      'refugee', 'refulgent', 'refurbish', 'refusal', 'refutation', 'refute', 'regal', 'regale', 'regarding', 'regatta',
+      'regenerate', 'regeneration', 'regent', 'regime', 'regimen', 'regiment', 'registrar', 'registry', 'regnant', 'regress',
+      'regression', 'regressive', 'regret', 'regularity', 'regulate', 'rehabilitate', 'reign', 'reimburse', 'rein', 'reinstate',
+      'reiterate', 'rejuvenate', 'relapse', 'release', 'relegate', 'relent', 'relentless', 'relevant', 'reliance', 'reliant',
+      'relinquish', 'relish', 'reluctant', 'remainder', 'remedial', 'remembrance', 'reminiscent', 'remiss', 'remission', 'remit',
+      'remittance', 'remnant', 'remonstrance', 'remonstrate', 'remorse', 'remorseful', 'remorseless', 'remote', 'remunerate', 'remuneration',
+      'renaissance', 'renascent', 'rend', 'rendezvous', 'rendition', 'renegade', 'renovate', 'renown', 'renunciation', 'reorient',
+      'reparable', 'reparation', 'repartee', 'repeal', 'repel', 'repellent', 'repentance', 'repentant', 'repercussion', 'repertoire',
+      'repertory', 'repetition', 'repine', 'replenish', 'replete', 'replica', 'replicate', 'repository', 'reprehend', 'reprehensible',
+      'repress', 'repression', 'repressive', 'reprieve', 'reprimand', 'reprisal', 'reprobate', 'reproduce', 'reproductive', 'reproof',
+      'reprove', 'reptile', 'repudiate', 'repugnant', 'repulse', 'repulsion', 'repulsive', 'reputable', 'repute', 'requiem',
+      'requisite', 'requisition', 'requital', 'requite', 'rescind', 'resemblance', 'resent', 'reserved', 'reservist', 'reservoir',
+      'reshape', 'reshuffle', 'residential', 'residual', 'residue', 'resignation', 'resigned', 'resilience', 'resilient', 'resin',
+      'resinous', 'resistance', 'resistant', 'resolute', 'resonance', 'resonate', 'resounding', 'resource', 'resourceful', 'respectability',
+      'respiration', 'respiratory', 'respite', 'resplendent', 'respondent', 'restful', 'restitution', 'restoration', 'restrict', 'resultant',
+      'resumption', 'resurgent', 'resurrect', 'resurrection', 'resuscitate', 'resuscitation', 'retainer', 'retaliate', 'retard', 'retention',
+      'reticent', 'retinue', 'retort', 'retouch', 'retrace', 'retract', 'retrench', 'retribution', 'retrievable', 'retrieval',
+      'retrieve', 'retroactive', 'retrograde', 'retrospect', 'retrospective', 'revamp', 'reveal', 'revel', 'revelation', 'revere',
+      'reverence', 'reverend', 'reverent', 'reverie', 'reversible', 'reversion', 'revert', 'revile', 'revitalize', 'revive',
+      'revocation', 'revoke', 'revolution', 'revulsion', 'rhetorical', 'rhinoceros', 'rhombus', 'ribald', 'ribaldry', 'rickets',
+      'rickety', 'rickshaw', 'riddance', 'ridicule', 'ridiculous', 'rife', 'rift', 'right', 'righteous', 'rightful',
+      'rigor', 'rigorous', 'rile', 'rind', 'rink', 'rinse', 'risible', 'ritual', 'rivet', 'roach',
+      'robust', 'rocker', 'rodent', 'rodeo', 'roger', 'rookie', 'roost', 'rooster', 'root', 'rosette',
+      'rostrum', 'rota', 'rotary', 'rotate', 'rotation', 'rotor', 'rouge', 'roughen', 'roulette', 'round',
+      'rounders', 'roundup', 'rouse', 'rove', 'rover', 'rowdy', 'royalist', 'rubble', 'rubdown', 'rucksack',
+      'ruckus', 'ruddy', 'rudimentary', 'rueful', 'ruffian', 'ruffle', 'rugger', 'ruin', 'ruinous', 'ruling',
+      'rumble', 'ruminate', 'rummage', 'rupture', 'rural', 'russet', 'rust', 'rustic', 'rustle', 'ruthless',
+      'sabbath', 'sabbatical', 'sabotage', 'saboteur', 'sabre', 'saccharine', 'sacrament', 'sacrifice', 'sacrilege', 'sacrilegious',
+      'sacrosanct', 'sadism', 'safari', 'safeguard', 'saffron', 'saga', 'sagacious', 'sagacity', 'sage', 'sailcloth',
+      'salacious', 'salamander', 'salient', 'saline', 'salivary', 'salivate', 'sallow', 'sallow', 'salt', 'salubrious',
+      'salutary', 'salutation', 'salutatory', 'salvage', 'salvageable', 'salvo', 'samba', 'sanctification', 'sanctify', 'sanctimonious',
+      'sanction', 'sanctuary', 'sanctum', 'sanguine', 'sanguineous', 'sapid', 'sapiential', 'saponaceous', 'sarcasm', 'sardonic',
+      'sarong', 'sartorial', 'sash', 'sash', 'satanic', 'satiate', 'satiation', 'satire', 'satirize', 'satisfy',
+      'saturation', 'satyr', 'savage', 'savagery', 'savant', 'savor', 'saxophone', 'scab', 'scaffold', 'scale',
+      'scallop', 'scalpel', 'scanner', 'scanty', 'scapegoat', 'scar', 'scarcity', 'scaremonger', 'scary', 'scathe',
+      'scathing', 'scatter', 'scatterbrain', 'scavenge', 'scavenger', 'scenario', 'schedule', 'schema', 'schematize', 'schizophrenia',
+      'scholarly', 'scholastic', 'scintillate', 'scintillation', 'scoff', 'scoff', 'scope', 'scoring', 'scour', 'scowl',
+      'scrawl', 'scrawny', 'screech', 'scribble', 'scribe', 'script', 'scripture', 'scrounge', 'scrub', 'scrum',
+      'scruple', 'scrupulous', 'scrutinize', 'scrutiny', 'scuba', 'scuffle', 'scum', 'scupper', 'scurf', 'scurrilous',
+      'scurry', 'scuttle', 'scuttle', 'sealant', 'sear', 'sebaceous', 'secant', 'secede', 'secession', 'seclude',
+      'secluded', 'seclusion', 'secondary', 'secrete', 'secretive', 'sectarian', 'section', 'sector', 'sedan', 'sedate',
+      'sedative', 'sedentary', 'sediment', 'sedition', 'seditious', 'seduce', 'seduction', 'seductive', 'sedulous', 'seed',
+      'seedy', 'seep', 'seethe', 'segment', 'segregate', 'segregation', 'seize', 'selective', 'selenium', 'semantic',
+      'semantics', 'semblance', 'semiannual', 'semiconductor', 'semiconscious', 'seminal', 'seminar', 'seminary', 'senator', 'senatorial',
+      'senile', 'senility', 'sensation', 'sensational', 'sensibility', 'sensitive', 'sensitivity', 'sensor', 'sensory', 'sensual',
+      'sensuous', 'sentient', 'sentimental', 'sentinel', 'sentry', 'separate', 'sepulchre', 'sequacious', 'sequel', 'sequence',
+      'sequent', 'sequester', 'serenade', 'serendipity', 'serene', 'serenity', 'serf', 'series', 'sermonize', 'serrated',
+      'serum', 'serviceable', 'servile', 'servility', 'servitude', 'setback', 'severely', 'severity', 'sexism', 'sexist',
+      'shack', 'shag', 'shaggy', 'sham', 'shamble', 'shanghai', 'shapely', 'shatter', 'sheaf', 'shear',
+      'sheath', 'sheen', 'sheepish', 'sheer', 'shield', 'shiftless', 'shimmer', 'shin', 'shirk', 'shoal',
+      'shoal', 'shoddy', 'shortchange', 'shortfall', 'shove', 'showpiece', 'showy', 'shred', 'shrew', 'shrewd',
+      'shriek', 'shrinkage', 'shrivel', 'shroud', 'shrubbery', 'shrubby', 'shuffle', 'shun', 'shunt', 'sibling',
+      'sickbay', 'sickening', 'side', 'sideline', 'sidestep', 'sidle', 'siege', 'sierra', 'sighting', 'signet',
+      'significant', 'silage', 'silhouette', 'silica', 'silo', 'silt', 'similar', 'simile', 'simmer', 'simpleton',
+      'simplify', 'simulate', 'simultaneous', 'simultaneously', 'sinecure', 'sinew', 'singe', 'sinister', 'sinuous', 'siphon',
+      'sirloin', 'sizeable', 'sizzle', 'skeleton', 'skid', 'skimmer', 'skinny', 'skipper', 'skirmish', 'skirt',
+      'skittish', 'slab', 'slag', 'slander', 'slanderous', 'slangy', 'slash', 'slat', 'slavish', 'sleazy',
+      'sleek', 'sleeper', 'sleight', 'slender', 'slick', 'slight', 'slime', 'slimnastics', 'slimy', 'slink',
+      'slit', 'slither', 'sliver', 'slogan', 'slop', 'slope', 'sloth', 'slothful', 'slouch', 'slovenly',
+      'slug', 'slug', 'sluggish', 'slump', 'slur', 'slurry', 'smelt', 'smother', 'smug', 'snag',
+      'snare', 'snarl', 'sniffle', 'snigger', 'snipe', 'sniper', 'snivel', 'snooty', 'snorkel', 'snort',
+      'snout', 'snub', 'snuff', 'sober', 'sobriety', 'sociable', 'socialize', 'soda', 'soggy', 'solace',
+      'solar', 'solder', 'solecism', 'solemn', 'solemnity', 'solicitous', 'solicitude', 'solid', 'solidification', 'soliloquy',
+      'soluble', 'solute', 'solution', 'solvency', 'solvent', 'somber', 'sombre', 'somnolent', 'sonar', 'sonata',
+      'sonorous', 'soothe', 'sophism', 'sophist', 'sophistical', 'sophisticated', 'soporific', 'soprano', 'sordid', 'sortie',
+      'sound', 'source', 'souvenir', 'space', 'spar', 'spar', 'sparingly', 'sparse', 'spartan', 'spasm',
+      'spasmodic', 'spate', 'spatial', 'spatter', 'specialty', 'species', 'specific', 'specimen', 'specious', 'speckle',
+      'spectacle', 'spectre', 'spectroscope', 'spectrum', 'speculate', 'speed', 'spew', 'sphere', 'spheroid', 'spider',
+      'spindle', 'spineless', 'spinner', 'spinous', 'spire', 'spirituality', 'spleen', 'splutter', 'spontaneous', 'spook',
+      'sporadic', 'spore', 'spout', 'sprawl', 'sprightly', 'sprint', 'spurious', 'squabble', 'squalid', 'squall',
+      'squalor', 'squander', 'square', 'squash', 'squash', 'squawk', 'squeak', 'squeal', 'squeamish', 'squelch',
+      'squint', 'squire', 'squirm', 'squirt', 'stability', 'staccato', 'stag', 'stagnant', 'stagnate', 'stagy',
+      'staid', 'stalemate', 'stalk', 'stallion', 'stalwart', 'stamina', 'stampede', 'stance', 'stanch', 'standing',
+      'stanza', 'starboard', 'starch', 'stardom', 'stark', 'stately', 'statement', 'static', 'stationary', 'statue',
+      'statuesque', 'stature', 'status', 'statute', 'steadfast', 'stealth', 'stealthily', 'steely', 'steep', 'stellar',
+      'stereotype', 'sterilize', 'sterling', 'stern', 'steroid', 'stethoscope', 'stifle', 'stigma', 'stile', 'still',
+      'stimulant', 'stimulate', 'stimulation', 'stimulus', 'stingy', 'stint', 'stipend', 'stipulate', 'stir', 'stirrup',
+      'stock', 'stoic', 'stoical', 'stoke', 'stolid', 'stoppage', 'stow', 'straddle', 'straggle', 'straightforward',
+      'strained', 'strait', 'straitlaced', 'strand', 'stratagem', 'stratify', 'stratum', 'strenuous', 'stressful', 'strew',
+      'stricture', 'strident', 'string', 'stringent', 'stripling', 'strontium', 'strut', 'strut', 'stub', 'stubble',
+      'stubborn', 'studious', 'stuffy', 'stultify', 'stun', 'stunt', 'stupefaction', 'stupendous', 'stupor', 'sturdy',
+      'stymie', 'suasion', 'suave', 'subconscious', 'subdivide', 'subdue', 'subjacent', 'subjection', 'subjective', 'subjectivity',
+      'subjugate', 'sublime', 'subliminal', 'submarine', 'submerge', 'submersion', 'submission', 'submit', 'subordinate', 'subscribe',
+      'subsequent', 'subside', 'subsidize', 'subsist', 'subsistence', 'substantial', 'substantiate', 'substantive', 'subterfuge', 'subterranean',
+      'subtle', 'subtlety', 'suburbanite', 'subversion', 'subversive', 'subvert', 'successive', 'successor', 'succinct', 'succor',
+      'succour', 'succulent', 'succumb', 'suction', 'sufferable', 'sufferance', 'suffice', 'sufficiency', 'suffrage', 'suffuse',
+      'sugar', 'suggestive', 'suitor', 'sulfur', 'sulk', 'sully', 'sulphurous', 'sultan', 'sultry', 'summary',
+      'summon', 'sumptuous', 'sundry', 'sunken', 'superb', 'supercilious', 'superficial', 'superfluous', 'superimpose', 'superintend',
+      'superintendent', 'superior', 'superlative', 'supersede', 'superstitious', 'supine', 'supplant', 'supple', 'supplement', 'supplementary',
+      'supplicant', 'supplicate', 'supposition', 'suppress', 'supremacy', 'surcharge', 'surety', 'surfeit', 'surly', 'surmise',
+      'surmount', 'surpass', 'surreal', 'surrealist', 'surrender', 'surreptitious', 'surrogate', 'surround', 'susceptibility', 'susceptible',
+      'suspect', 'suspend', 'suspense', 'suspension', 'suspicion', 'suspicious', 'sustainable', 'sustenance', 'swagger', 'swamp',
+      'swap', 'swathe', 'sweeping', 'swerve', 'swift', 'swindle', 'swine', 'swipe', 'swirl', 'switch',
+      'swivel', 'swoop', 'sycophant', 'syllabic', 'syllable', 'syllabus', 'symbolize', 'symmetrical', 'symmetry', 'sympathetic',
+      'symphonious', 'symphony', 'symptomatic', 'synagogue', 'synchronous', 'syndicate', 'syndrome', 'synonym', 'synonymous', 'synopsis',
+      'synoptic', 'syntactic', 'synthesis', 'synthesize', 'synthetic', 'syphilis', 'systematic', 'table', 'tabulate', 'tacit',
+      'tacitly', 'taciturn', 'tacky', 'tact', 'tactful', 'tactician', 'taffeta', 'tailplane', 'taint', 'takings',
+      'tamper', 'tangent', 'tangential', 'tangible', 'tanner', 'tannic', 'tantalize', 'tantamount', 'tantrum', 'taper',
+      'tapeworm', 'tarnish', 'tarry', 'tarry', 'tartan', 'tartly', 'tatters', 'tattooist', 'taunt', 'taut',
+      'tawdry', 'teak', 'technicality', 'technique', 'technocracy', 'technology', 'tedious', 'tedium', 'teem', 'teeter',
+      'telepathy', 'telescope', 'telling', 'temerity', 'temper', 'temperance', 'temperate', 'temperature', 'tempestuous', 'tempo',
+      'temporal', 'temporary', 'tempt', 'tenable', 'tenacious', 'tenacity', 'tendency', 'tendon', 'tenet', 'tenor',
+      'tense', 'tensile', 'tension', 'tentative', 'tenuous', 'tenure', 'tepid', 'term', 'terminal', 'terminate',
+      'termination', 'terminus', 'terrain', 'terrestrial', 'terrify', 'territorial', 'terry', 'terse', 'test', 'testament',
+      'testator', 'testimonial', 'testimony', 'tether', 'textual', 'thatch', 'thee', 'thematic', 'theorem', 'theoretical',
+      'theorist', 'theorize', 'theory', 'therapeutic', 'therein', 'thereto', 'thereupon', 'therewith', 'thermal', 'thermocouple',
+      'thermodynamics', 'thermometer', 'thermonuclear', 'thesis', 'thicket', 'thistle', 'thoroughbred', 'thrall', 'threadbare', 'thrice',
+      'throb', 'throttle', 'throughput', 'thud', 'thug', 'thump', 'thunderclap', 'thunderous', 'thwart', 'thyroid',
+      'tiara', 'tilt', 'timbre', 'timely', 'timer', 'timidity', 'timorous', 'tinder', 'tinge', 'tingle',
+      'tinker', 'tinny', 'tint', 'tipsy', 'tirade', 'titan', 'titanic', 'toilsome', 'token', 'tolerable',
+      'tolerate', 'toll', 'tonal', 'tongs', 'tonic', 'topographer', 'topography', 'torpid', 'torpor', 'torque',
+      'torrid', 'torsion', 'torso', 'tortuous', 'torturous', 'total', 'totalitarian', 'totalitarianism', 'totter', 'tour',
+      'tout', 'toxic', 'toxin', 'tract', 'tractable', 'tragedian', 'trait', 'trajectory', 'trammel', 'trample',
+      'trance', 'tranquil', 'transact', 'transcend', 'transcendent', 'transcendental', 'transcribe', 'transcript', 'transcription', 'transfer',
+      'transfigure', 'transformer', 'transfuse', 'transgenic', 'transgress', 'transgression', 'transience', 'transient', 'transistor', 'transition',
+      'transitory', 'translation', 'translucent', 'transmission', 'transmit', 'transmutation', 'transmute', 'transparent', 'transpire', 'transplant',
+      'transpose', 'transposition', 'transverse', 'trapezoid', 'trauma', 'travail', 'traverse', 'travesty', 'trawler', 'treacherous',
+      'treachery', 'treatise', 'treble', 'trek', 'tremendous', 'tremor', 'tremulous', 'trenchant', 'trepidation', 'trespass',
+      'trestle', 'trial', 'triangle', 'tribulation', 'tributary', 'tribute', 'trick', 'trickery', 'tricycle', 'triennial',
+      'trifle', 'trigger', 'trill', 'trilogy', 'trinket', 'triple', 'tripod', 'tripper', 'trite', 'triumph',
+      'trivia', 'trivial', 'tropical', 'troubadour', 'trough', 'trounce', 'trove', 'truce', 'truculent', 'trudge',
+      'truism', 'trump', 'truncated', 'trundle', 'trying', 'tryout', 'tuba', 'tube', 'tubular', 'tuft',
+      'tulip', 'tumor', 'tumult', 'tumultuous', 'tundra', 'turbid', 'turbine', 'turbot', 'turgid', 'turmoil',
+      'turner', 'turning', 'turnout', 'turpitude', 'turret', 'tutelage', 'tutorship', 'tweed', 'twinge', 'twirl',
+      'twitch', 'typical', 'typify', 'typography', 'tyrannical', 'tyrannize', 'tyranny', 'tyro', 'ubiquitous', 'ulcer',
+      'ulterior', 'ultimate', 'ultimatum', 'ultramontane', 'ultrasonic', 'ultrasound', 'umpire', 'unabashed', 'unabated', 'unaccountable',
+      'unaffected', 'unanimity', 'unanimous', 'unassuming', 'unawares', 'unbecoming', 'unbiased', 'uncanny', 'unceremonious', 'uncharitable',
+      'unconscionable', 'unconscious', 'uncouth', 'unctuous', 'underbrush', 'undercharge', 'undercut', 'underdog', 'underdone', 'underexposure',
+      'undergrowth', 'underhand', 'underlie', 'underling', 'undermine', 'underscore', 'undersell', 'undersize', 'understate', 'understudy',
+      'undervalue', 'underwrite', 'undue', 'undulate', 'unduly', 'uneconomic', 'unequivocal', 'unfailing', 'unfathomable', 'unfavorable',
+      'unforeseen', 'ungainly', 'ungodly', 'ungracious', 'ungrateful', 'unicorn', 'uniform', 'unify', 'unilateral', 'unintelligible',
+      'uninviting', 'unison', 'unisonous', 'unit', 'unkempt', 'unknown', 'unleash', 'unlisted', 'unnerve', 'unobtrusive',
+      'unorthodox', 'unpalatable', 'unparalleled', 'unpretentious', 'unprincipled', 'unqualified', 'unravel', 'unrelenting', 'unremitting', 'unruly',
+      'unsavory', 'unsavoury', 'unscrew', 'unscrupulous', 'unseemly', 'unsettle', 'unsettled', 'unsightly', 'unspeakable', 'unsuspecting',
+      'unswerving', 'untenable', 'untimely', 'untold', 'untouchable', 'untoward', 'untruth', 'unused', 'unveil', 'unwieldy',
+      'unwind', 'unwitting', 'unworldly', 'unyielding', 'upbraid', 'upcoming', 'upfront', 'upheaval', 'upheave', 'uphold',
+      'upholster', 'upkeep', 'uplift', 'upmarket', 'uprising', 'uproarious', 'uproot', 'upshot', 'upstart', 'upstream',
+      'upsurge', 'upturn', 'uranium', 'urbane', 'urchin', 'urea', 'urgency', 'urgent', 'urinate', 'urine',
+      'usage', 'usurer', 'usurious', 'usurp', 'usury', 'utilitarian', 'utility', 'utilize', 'utmost', 'utopia',
+      'utopian', 'utter', 'vacate', 'vaccinate', 'vaccine', 'vacillate', 'vacuity', 'vacuous', 'vacuum', 'vagabond',
+      'vagrant', 'vague', 'vain', 'vainglorious', 'valediction', 'valedictory', 'valet', 'valid', 'validate', 'validity',
+      'valor', 'valorous', 'valve', 'vandal', 'vandalism', 'vanguard', 'vanilla', 'vanquish', 'vantage', 'vapid',
+      'vaporization', 'vaporize', 'variable', 'variant', 'variation', 'varicose', 'variegated', 'vaudeville', 'vault', 'veal',
+      'vector', 'veer', 'vegetable', 'vegetal', 'vegetarian', 'vegetate', 'vegetation', 'vegetative', 'vehement', 'veil',
+      'vein', 'velocity', 'velvety', 'venal', 'vendor', 'veneer', 'venerable', 'venerate', 'venereal', 'vengeance',
+      'vengeful', 'venial', 'venison', 'venom', 'venomous', 'venous', 'ventral', 'ventricle', 'ventricular', 'veracious',
+      'veracity', 'verbatim', 'verbose', 'verdant', 'verdict', 'verdure', 'verifiable', 'verification', 'verify', 'verisimilar',
+      'verisimilitude', 'veritable', 'verity', 'vermicide', 'vermin', 'vernacular', 'vernal', 'versatile', 'versatility', 'verse',
+      'version', 'vertebrate', 'vertex', 'vertical', 'vertigo', 'verve', 'vestige', 'veto', 'vexation', 'vexatious',
+      'viable', 'vial', 'vibration', 'vicarage', 'vicarious', 'vicariously', 'viceroy', 'vicinity', 'vicious', 'vicissitude',
+      'victimize', 'vigil', 'vigilance', 'vigilant', 'vignette', 'vile', 'vilify', 'villainous', 'vindicate', 'vindictive',
+      'vinery', 'viola', 'violation', 'violent', 'viral', 'virile', 'virtu', 'virtual', 'virtuoso', 'virtuous',
+      'virulent', 'virus', 'visage', 'viscera', 'visceral', 'viscount', 'visibility', 'visitation', 'vista', 'visual',
+      'visualize', 'vital', 'vitality', 'vitalize', 'vitamin', 'vitiate', 'vivacious', 'vivacity', 'vivid', 'vivify',
+      'vocabulary', 'vocal', 'vocalist', 'vocalization', 'vocally', 'vocation', 'vocative', 'vociferate', 'vociferous', 'vodka',
+      'vogue', 'void', 'volant', 'volatile', 'volatility', 'volition', 'volitional', 'volitive', 'volt', 'voltage',
+      'voluble', 'volume', 'voluminous', 'voluptuous', 'voracious', 'vortex', 'votary', 'votive', 'vulgar', 'vulgarity',
+      'vulnerable', 'vulture', 'waddle', 'wade', 'wafer', 'waif', 'wail', 'waistcoat', 'waive', 'wallow',
+      'wand', 'wane', 'wanton', 'wares', 'warp', 'warrant', 'warranty', 'wary', 'washout', 'watermark',
+      'watery', 'watt', 'wave', 'wavelength', 'wavelet', 'waver', 'wayward', 'wean', 'wearisome', 'wedge',
+      'weight', 'weightlessness', 'weighty', 'weird', 'well', 'whack', 'wherever', 'whet', 'whiff', 'whim',
+      'whimsical', 'whine', 'whirlwind', 'whisk', 'whiten', 'whitewash', 'whizz', 'whoop', 'wicked', 'wicker',
+      'widespread', 'wield', 'wiggle', 'wile', 'wilt', 'wily', 'wince', 'windfall', 'winsome', 'wintry',
+      'wiry', 'wisp', 'wistful', 'witchcraft', 'withdraw', 'withhold', 'withstand', 'witling', 'witness', 'witticism',
+      'wittingly', 'wizard', 'wizen', 'wobble', 'woeful', 'womanly', 'wording', 'work', 'workmanlike', 'workmanship',
+      'wrangle', 'wrapper', 'wrath', 'wreak', 'wreathe', 'wreckage', 'wrench', 'wrest', 'wretch', 'wriggle',
+      'wring', 'writhe', 'xenophobe', 'xenophobia', 'yahoo', 'yank', 'yearling', 'yeoman', 'yoga', 'yummy',
+      'yuppie', 'zany', 'zeal', 'zealot', 'zealous', 'zeitgeist', 'zenith', 'zephyr', 'zero', 'zest',
+      'zionism', 'zoom', 'zulu',
     ];
 
-    let lives = 3;
+    let lives = 1;
     let score = 0;
     let startTime = 0;
     let totalTimeMs = 0;
@@ -862,7 +1268,6 @@
     let isFirstAnswer = false;
     let history = JSON.parse(localStorage.getItem(storageKey) || '[]');
     let customWordList = JSON.parse(localStorage.getItem(customWordsKey) || '[]');
-    let isSaved = false;
 
     function getActiveWordList() {
       return customWordList.length > 0 ? customWordList : builtInWordList;
@@ -897,7 +1302,7 @@
 
     function chooseNextWord() {
       const forceRepeat = consecutiveNewWords >= 5;
-      const shouldRepeat = forceRepeat || (shownWords.length > 2 && Math.random() < 0.4);
+      const shouldRepeat = forceRepeat || (shownWords.length > 2 && Math.random() < 0.35);
 
       if (shouldRepeat) {
         const seenPool = [...seenWords].filter(word => word !== currentWord);
@@ -931,7 +1336,9 @@
     }
 
     function startGame() {
-      lives = 3;
+      musicToggle.disabled = true;
+      
+      lives = 1;
       score = 0;
       totalTimeMs = 0;
       currentWord = '';
@@ -939,7 +1346,6 @@
       shownWords = [];
       consecutiveNewWords = 0;
       isFirstAnswer = true;
-      isSaved = false;
       updateStats();
       showScreen('game');
       nextRound();
@@ -974,26 +1380,23 @@
     }
 
     function endGame() {
+      musicToggle.disabled = false;
+      
       totalTimeMs = Math.round(performance.now() - startTime);
       finalScore.textContent = `${score} ${score === 1 ? 'word' : 'words'}`;
       finalTime.textContent = `Total time ${formatMs(totalTimeMs)}`;
-      showScreen('result');
-    }
-
-    function saveResult() {
-      if (isSaved) return;
       
       const record = {
         score,
         timeMs: totalTimeMs,
-        date: new Date().toLocaleString('zh-CN', { hour12: false })
+        date: new Date().toLocaleString('zh-CN', { hour12: false }),
+        music: musicToggle.checked ? '开' : '关'
       };
       history.unshift(record);
       localStorage.setItem(storageKey, JSON.stringify(history));
       renderHistory();
-      saveBtn.textContent = 'Saved';
-      saveBtn.disabled = true;
-      isSaved = true;
+      
+      showScreen('result');
     }
 
     function renderHistory() {
@@ -1003,18 +1406,30 @@
           <td>${item.score}</td>
           <td>${formatMs(item.timeMs)}</td>
           <td>${item.date}</td>
+          <td>${item.music || '关'}</td>
         </tr>
       `).join('');
+      
+      const highScore = history.reduce((max, item) => Math.max(max, item.score), 0);
+      highScoreDisplay.textContent = highScore > 0 ? `🏆 最高分: ${highScore}` : '';
     }
 
     function exportCsv() {
-      const header = ['No.', 'Score', 'Total Time', 'Time Ms', 'Date'];
+      const formatTime = (ms) => {
+        const msNum = typeof ms === 'string' ? parseInt(ms) : ms;
+        const totalSeconds = Math.floor(msNum / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const tenths = Math.floor(msNum / 100) % 10;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${tenths}`;
+      };
+      const header = ['No.', 'Score', 'Total Time', 'Date', 'Music'];
       const rows = history.slice().reverse().map((item, index) => [
         index + 1,
         item.score,
-        formatMs(item.timeMs),
-        item.timeMs,
-        item.date
+        formatTime(item.timeMs),
+        item.date,
+        item.music || '关'
       ]);
       const csv = [header, ...rows]
         .map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(','))
@@ -1031,8 +1446,7 @@
     startBtn.addEventListener('click', startGame);
     seenBtn.addEventListener('click', () => answer(true));
     newBtn.addEventListener('click', () => answer(false));
-    tryAgainBtn.addEventListener('click', startGame);
-    saveBtn.addEventListener('click', saveResult);
+    tryAgainBtn.addEventListener('click', () => showScreen('home'));
 
     historyBtn.addEventListener('click', () => {
       historyPanel.classList.toggle('show');
@@ -1103,7 +1517,7 @@
       }
     }
 
-    loadWordListFromServer();
+    // loadWordListFromServer();
   </script>
 </body>
 </html>
