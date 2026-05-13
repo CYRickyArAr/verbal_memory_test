@@ -265,7 +265,7 @@
       right: 18px;
       top: 18px;
       font-size: 16px;
-      color: #4CAF50;
+      color: #222222;
       z-index: 100;
     }
 
@@ -1411,7 +1411,7 @@
       `).join('');
       
       const highScore = history.reduce((max, item) => Math.max(max, item.score), 0);
-      highScoreDisplay.textContent = highScore > 0 ? `🏆 最高分: ${highScore}` : '';
+      highScoreDisplay.textContent = `🏆 最高分: ${highScore}`;
     }
 
     function exportCsv() {
