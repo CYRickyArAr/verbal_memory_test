@@ -1489,35 +1489,6 @@
 
     renderHistory();
     updateWordCount();
-
-    async function loadWordListFromServer() {
-      if (customWordList.length > 0) {
-        return;
-      }
-      try {
-        const response = await fetch('考研-乱序_仅单词.txt');
-        if (!response.ok) throw new Error('文件不存在');
-        
-        const text = await response.text();
-        const words = text
-          .split('\n')
-          .map(word => word.trim().toLowerCase())
-          .filter(word => word.length > 0 && /^[a-z][a-z\- ]{1,40}$/.test(word));
-
-        const uniqueWords = [...new Set(words)];
-        
-        if (uniqueWords.length >= 10) {
-          customWordList = uniqueWords;
-          localStorage.setItem(customWordsKey, JSON.stringify(customWordList));
-          updateWordCount();
-          console.log(`自动加载词汇表成功，共 ${uniqueWords.length} 个词`);
-        }
-      } catch (error) {
-        console.log('自动加载词汇表失败，使用内置词库:', error.message);
-      }
-    }
-
-    // loadWordListFromServer();
   </script>
 </body>
 </html>
